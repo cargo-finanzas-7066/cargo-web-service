@@ -43,6 +43,7 @@ public class VehicleServiceImpl implements VehicleService {
     private VehicleResource toResource(VehicleEntity entity) {
         var resource = new VehicleResource();
         resource.setId(entity.getId());
+        resource.setCode(entity.getCode());
         resource.setBrand(entity.getBrand());
         resource.setModel(entity.getModel());
         resource.setYear(entity.getYear());
@@ -61,6 +62,7 @@ public class VehicleServiceImpl implements VehicleService {
                 ? vehicleRepository.findById(resource.getId()).orElse(new VehicleEntity())
                 : new VehicleEntity();
         entity.setId(resource.getId());
+        entity.setCode(resource.getCode());
         entity.setBrand(resource.getBrand());
         entity.setModel(resource.getModel());
         entity.setYear(resource.getYear());

@@ -5,6 +5,7 @@ import lombok.Data;
 @Data
 public class VehicleResource {
     private Integer id;
+    private String code;
     private String brand;
     private String model;
     private Integer year;

@@ -12,12 +12,15 @@ public class SimulationRequest {
     private String currency = "PEN";
     private Double vehiclePrice;
     private Double downPayment;
+    private Double downPaymentPercent = 20.0;
     private Integer term;
     private Double tea;
     private Integer paymentDay = 5;
     private LocalDate disbursementDate;
     private String graceType = "none";
     private Integer graceMonths = 0;
+    private Boolean balloonEnabled = false;
+    private Double balloonAmount = 0.0;
     private Double insuranceDisbursement = 0.05;
     private Double insuranceVehicle = 3.5;
     private Double monthlyFee = 0.0;
