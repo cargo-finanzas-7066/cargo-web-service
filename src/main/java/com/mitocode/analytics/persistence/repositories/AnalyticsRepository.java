@@ -1,6 +1,6 @@
 package com.mitocode.analytics.persistence.repositories;
 
-import com.mitocode.repository.ClientRepository;
+import com.mitocode.customers.persistence.repositories.CustomerRepository;
 import com.mitocode.repository.SimulationRepository;
 import com.mitocode.vehicles.persistence.entities.VehicleEntity;
 import com.mitocode.vehicles.persistence.repositories.VehicleRepository;
@@ -13,7 +13,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AnalyticsRepository {
     private final SimulationRepository simulationRepository;
-    private final ClientRepository clientRepository;
+    private final CustomerRepository customerRepository;
     private final VehicleRepository vehicleRepository;
 
     public long countSimulations() {
@@ -21,7 +21,7 @@ public class AnalyticsRepository {
     }
 
     public long countClients() {
-        return clientRepository.count();
+        return customerRepository.count();
     }
 
     public List<VehicleEntity> findRecentVehicles() {
