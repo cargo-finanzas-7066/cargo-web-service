@@ -7,6 +7,7 @@ import com.mitocode.financialinstitutions.services.interfaces.FinancialInstituti
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Service
@@ -33,20 +34,20 @@ public class FinancialInstitutionServiceImpl implements FinancialInstitutionServ
         resource.setId(entity.getId());
         resource.setCode(entity.getCode());
         resource.setDisplayOrder(entity.getDisplayOrder());
-        resource.setName(entity.getName());
-        resource.setShortName(entity.getShortName());
-        resource.setType(entity.getType());
-        resource.setLogoText(entity.getLogoText());
-        resource.setCurrency(entity.getCurrency());
-        resource.setCreditType(entity.getCreditType());
-        resource.setProduct(entity.getProduct());
-        resource.setTeaPublishedLabel(entity.getTeaPublishedLabel());
-        resource.setMinimumInitialLabel(entity.getMinimumInitialLabel());
-        resource.setMaximumFinancingLabel(entity.getMaximumFinancingLabel());
-        resource.setTermLabel(entity.getTermLabel());
-        resource.setGraceLabel(entity.getGraceLabel());
-        resource.setInsuranceSummaryLabel(entity.getInsuranceSummaryLabel());
-        resource.setChargesSummaryLabel(entity.getChargesSummaryLabel());
+        resource.setName(clean(entity.getName()));
+        resource.setShortName(clean(entity.getShortName()));
+        resource.setType(clean(entity.getType()));
+        resource.setLogoText(clean(entity.getLogoText()));
+        resource.setCurrency(clean(entity.getCurrency()));
+        resource.setCreditType(clean(entity.getCreditType()));
+        resource.setProduct(clean(entity.getProduct()));
+        resource.setTeaPublishedLabel(clean(entity.getTeaPublishedLabel()));
+        resource.setMinimumInitialLabel(clean(entity.getMinimumInitialLabel()));
+        resource.setMaximumFinancingLabel(clean(entity.getMaximumFinancingLabel()));
+        resource.setTermLabel(clean(entity.getTermLabel()));
+        resource.setGraceLabel(clean(entity.getGraceLabel()));
+        resource.setInsuranceSummaryLabel(clean(entity.getInsuranceSummaryLabel()));
+        resource.setChargesSummaryLabel(clean(entity.getChargesSummaryLabel()));
         resource.setTea(entity.getTea());
         resource.setMinTerm(entity.getMinTerm());
         resource.setMaxTerm(entity.getMaxTerm());
@@ -59,11 +60,30 @@ public class FinancialInstitutionServiceImpl implements FinancialInstitutionServ
         resource.setRatesJson(entity.getRatesJson());
         resource.setInsurancesJson(entity.getInsurancesJson());
         resource.setChargesJson(entity.getChargesJson());
-        resource.setSourceName(entity.getSourceName());
+        resource.setSourceName(clean(entity.getSourceName()));
         resource.setSourceDate(entity.getSourceDate());
         resource.setVerificationStatus(entity.getVerificationStatus());
         resource.setCanUseInSimulation(entity.getCanUseInSimulation());
         resource.setStatus(entity.getStatus());
         return resource;
+    }
+
+    private String clean(String value) {
+        if (value == null) {
+            return null;
+        }
+        String cleaned = value;
+        if (cleaned.contains("Ã") || cleaned.contains("Â") || cleaned.contains("ï¿½")) {
+            cleaned = new String(cleaned.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
+        }
+        return cleaned
+                .replace("Ã¡", "\u00e1")
+                .replace("Ã©", "\u00e9")
+                .replace("Ã­", "\u00ed")
+                .replace("Ã³", "\u00f3")
+                .replace("Ãº", "\u00fa")
+                .replace("Ã±", "\u00f1")
+                .replace("Â¿", "\u00bf")
+                .replace("Â¡", "\u00a1");
     }
 }
