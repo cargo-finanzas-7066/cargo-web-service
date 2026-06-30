@@ -68,7 +68,93 @@ public class FinancialInstitutionSeedService implements CommandLineRunner {
             entity.setSourceName(verification.path("sourceName").asText("Fuente oficial"));
             entity.setSourceDate(reviewedAt);
             entity.setVerificationStatus(verification.path("status").asText("VERIFIED"));
+            applyExcelFirstSheetCorrections(entity);
             financialInstitutionRepository.save(entity);
+        }
+    }
+
+    private void applyExcelFirstSheetCorrections(FinancialInstitutionEntity entity) {
+        if ("BCP".equals(entity.getCode())) {
+            entity.setTeaPublishedLabel("8.00% - 20.26%");
+            entity.setMinimumInitialLabel("Desde 0%");
+            entity.setMaximumFinancingLabel("Hasta 100%");
+            entity.setMinDownPayment(0.0);
+            entity.setMaxFinancing(100.0);
+            entity.setMinTerm(3);
+            entity.setMaxTerm(60);
+            entity.setTea(12.50);
+            entity.setCanUseInSimulation(true);
+            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
+        }
+        if ("BBVA".equals(entity.getCode())) {
+            entity.setTeaPublishedLabel("1.99% - 24.99%");
+            entity.setMinimumInitialLabel("Desde 0%");
+            entity.setMaximumFinancingLabel("Hasta 100%");
+            entity.setMinDownPayment(0.0);
+            entity.setMaxFinancing(100.0);
+            entity.setMinTerm(12);
+            entity.setMaxTerm(72);
+            entity.setTea(8.65);
+            entity.setCanUseInSimulation(true);
+            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
+        }
+        if ("INTERBANK".equals(entity.getCode())) {
+            entity.setTeaPublishedLabel("Hasta 16.39%");
+            entity.setMinimumInitialLabel("Desde 0%");
+            entity.setMaximumFinancingLabel("Hasta 100%");
+            entity.setMinDownPayment(0.0);
+            entity.setMaxFinancing(100.0);
+            entity.setMinTerm(12);
+            entity.setMaxTerm(60);
+            entity.setTea(14.49);
+            entity.setCanUseInSimulation(true);
+            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
+        }
+        if ("SCOTIABANK".equals(entity.getCode())) {
+            entity.setTeaPublishedLabel("8.99% - 22.99%");
+            entity.setMinimumInitialLabel("Desde 0%");
+            entity.setMaximumFinancingLabel("Hasta 100%");
+            entity.setMinDownPayment(0.0);
+            entity.setMaxFinancing(100.0);
+            entity.setMinTerm(12);
+            entity.setMaxTerm(60);
+            entity.setTea(11.90);
+            entity.setCanUseInSimulation(true);
+            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
+        }
+        if ("SANTANDER_CONSUMER".equals(entity.getCode())) {
+            entity.setMinimumInitialLabel("Desde 10% / Plan 50|50 con 50%");
+            entity.setMaximumFinancingLabel("Hasta 90% / Plan 50|50 financia 50%");
+            entity.setMinDownPayment(10.0);
+            entity.setMaxFinancing(90.0);
+            entity.setMinTerm(12);
+            entity.setMaxTerm(60);
+            entity.setCanUseInSimulation(true);
+            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
+        }
+        if ("GNB".equals(entity.getCode())) {
+            entity.setTeaPublishedLabel("10.50% - 14.90%");
+            entity.setMinimumInitialLabel("Desde 10%");
+            entity.setMaximumFinancingLabel("Hasta 90%");
+            entity.setMinDownPayment(10.0);
+            entity.setMaxFinancing(90.0);
+            entity.setMinTerm(12);
+            entity.setMaxTerm(60);
+            entity.setTea(10.50);
+            entity.setCanUseInSimulation(true);
+            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
+        }
+        if ("BANBIF".equals(entity.getCode())) {
+            entity.setTeaPublishedLabel("Hasta 39.99%");
+            entity.setMinimumInitialLabel("Desde 0%");
+            entity.setMaximumFinancingLabel("Hasta 100%");
+            entity.setMinDownPayment(0.0);
+            entity.setMaxFinancing(100.0);
+            entity.setMinTerm(12);
+            entity.setMaxTerm(72);
+            entity.setTea(39.99);
+            entity.setCanUseInSimulation(true);
+            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
         }
     }
 
@@ -101,7 +187,18 @@ public class FinancialInstitutionSeedService implements CommandLineRunner {
     private Double findVehicleInsurance(JsonNode entity) {
         for (JsonNode insurance : entity.path("insurances")) {
             if (insurance.path("type").asText().contains("VEHICULAR")) {
-                return firstNonNullDouble(insurance.path("ratePercentMonthly"), insurance.path("ratePercentAnnual"), insurance.path("ratePercentAnnualMin"));
+                Double annualRate = nullableDouble(insurance.path("ratePercentAnnual"));
+                if (annualRate != null) {
+                    return annualRate;
+                }
+                Double annualMinRate = nullableDouble(insurance.path("ratePercentAnnualMin"));
+                if (annualMinRate != null) {
+                    return annualMinRate;
+                }
+                Double monthlyRate = nullableDouble(insurance.path("ratePercentMonthly"));
+                if (monthlyRate != null) {
+                    return monthlyRate * 12.0;
+                }
             }
         }
         return 0.0;
