@@ -33,10 +33,14 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public VehicleResource save(VehicleResource vehicle) {
-        if (vehicle.getId() == null && vehicleRepository.findByCode(vehicle.getCode()).isPresent()) {
+        if (isNew(vehicle.getId()) && vehicleRepository.findByCode(vehicle.getCode()).isPresent()) {
             throw new ConflictException("Ya existe un vehículo con ese código");
         }
         return toResource(vehicleRepository.save(toEntity(vehicle)));
+    }
+
+    private boolean isNew(Integer id) {
+        return id == null || id == 0;
     }
 
     @Override
@@ -66,10 +70,9 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     private VehicleEntity toEntity(VehicleResource resource) {
-        var entity = resource.getId() != null
-                ? vehicleRepository.findByIdAndActiveTrue(resource.getId()).orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"))
-                : new VehicleEntity();
-        entity.setId(resource.getId());
+        var entity = isNew(resource.getId())
+                ? new VehicleEntity()
+                : vehicleRepository.findByIdAndActiveTrue(resource.getId()).orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
         entity.setCode(resource.getCode());
         entity.setBrand(resource.getBrand());
         entity.setModel(resource.getModel());

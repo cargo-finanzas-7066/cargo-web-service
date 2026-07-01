@@ -45,11 +45,15 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     public CustomerResource save(CustomerResource customer) {
         var user = currentUserService.requireUser();
-        if (customer.getId() == null && customerRepository.existsByOwnerIdAndDocTypeIgnoreCaseAndDocNumber(
+        if (isNew(customer.getId()) && customerRepository.existsByOwnerIdAndDocTypeIgnoreCaseAndDocNumber(
                 user.getId(), customer.getDocType(), customer.getDocNumber())) {
             throw new ConflictException("Ya existe un cliente con ese documento");
         }
         return toResource(customerRepository.save(toEntity(customer, user)));
+    }
+
+    private boolean isNew(Integer id) {
+        return id == null || id == 0;
     }
 
     @Override
@@ -80,10 +84,10 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     private CustomerEntity toEntity(CustomerResource resource, com.mitocode.iam.persistence.entities.UserEntity user) {
-        var entity = resource.getId() != null ? (user.getRole() == Role.ADMIN
+        var entity = isNew(resource.getId()) ? new CustomerEntity() : (user.getRole() == Role.ADMIN
                 ? customerRepository.findByIdAndArchivedFalse(resource.getId())
                 : customerRepository.findByIdAndOwnerIdAndArchivedFalse(resource.getId(), user.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado")) : new CustomerEntity();
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
         if (entity.getId() == null) entity.setOwner(user);
         entity.setDocType(resource.getDocType());
         entity.setDocNumber(resource.getDocNumber());
