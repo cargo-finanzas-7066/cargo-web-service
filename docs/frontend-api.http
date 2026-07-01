@@ -1,0 +1,22 @@
+@baseUrl = http://localhost:8080
+@token = replace_after_sign_in
+
+### Sign in
+POST {{baseUrl}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{"email":"admin@cargo.local","password":"ChangeMe123!"}
+
+### Current user
+GET {{baseUrl}}/api/v1/auth/me
+Authorization: Bearer {{token}}
+
+### Public catalogues
+GET {{baseUrl}}/api/v1/vehicles?page=0&size=20
+
+### Quote
+POST {{baseUrl}}/api/v1/quotes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"clientId":1,"vehicleId":1,"financialProductIds":[1],"downPaymentPercent":20,"termMonths":36,"firstPaymentDate":"2026-07-05","paymentDay":5,"graceType":"NONE","graceMonths":0,"balloonPercent":0}

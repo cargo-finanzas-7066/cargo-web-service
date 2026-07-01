@@ -1,15 +1,43 @@
 services:
+  api:
+    profiles: ["full"]
+    build: .
+    container_name: cargo-platform-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_URL: jdbc:postgresql://postgres:5432/cargo_platform
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-development-secret-key-change-me-32-chars}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@cargo.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
   postgres:
     image: postgres:16-alpine
     container_name: cargo-platform-postgres
     environment:
       POSTGRES_DB: cargo_platform
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - cargo-platform-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cargo_platform"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   cargo-platform-postgres:
