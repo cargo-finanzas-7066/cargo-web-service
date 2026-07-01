@@ -8,8 +8,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 
 @Component
+@Profile("dev")
+@Order(10)
 @RequiredArgsConstructor
 public class FinancialInstitutionSeedService implements CommandLineRunner {
     private final FinancialInstitutionRepository financialInstitutionRepository;
@@ -107,52 +111,6 @@ public class FinancialInstitutionSeedService implements CommandLineRunner {
             entity.setMinTerm(12);
             entity.setMaxTerm(60);
             entity.setTea(14.49);
-            entity.setCanUseInSimulation(true);
-            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
-        }
-        if ("SCOTIABANK".equals(entity.getCode())) {
-            entity.setTeaPublishedLabel("8.99% - 22.99%");
-            entity.setMinimumInitialLabel("Desde 0%");
-            entity.setMaximumFinancingLabel("Hasta 100%");
-            entity.setMinDownPayment(0.0);
-            entity.setMaxFinancing(100.0);
-            entity.setMinTerm(12);
-            entity.setMaxTerm(60);
-            entity.setTea(11.90);
-            entity.setCanUseInSimulation(true);
-            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
-        }
-        if ("SANTANDER_CONSUMER".equals(entity.getCode())) {
-            entity.setMinimumInitialLabel("Desde 10% / Plan 50|50 con 50%");
-            entity.setMaximumFinancingLabel("Hasta 90% / Plan 50|50 financia 50%");
-            entity.setMinDownPayment(10.0);
-            entity.setMaxFinancing(90.0);
-            entity.setMinTerm(12);
-            entity.setMaxTerm(60);
-            entity.setCanUseInSimulation(true);
-            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
-        }
-        if ("GNB".equals(entity.getCode())) {
-            entity.setTeaPublishedLabel("10.50% - 14.90%");
-            entity.setMinimumInitialLabel("Desde 10%");
-            entity.setMaximumFinancingLabel("Hasta 90%");
-            entity.setMinDownPayment(10.0);
-            entity.setMaxFinancing(90.0);
-            entity.setMinTerm(12);
-            entity.setMaxTerm(60);
-            entity.setTea(10.50);
-            entity.setCanUseInSimulation(true);
-            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
-        }
-        if ("BANBIF".equals(entity.getCode())) {
-            entity.setTeaPublishedLabel("Hasta 39.99%");
-            entity.setMinimumInitialLabel("Desde 0%");
-            entity.setMaximumFinancingLabel("Hasta 100%");
-            entity.setMinDownPayment(0.0);
-            entity.setMaxFinancing(100.0);
-            entity.setMinTerm(12);
-            entity.setMaxTerm(72);
-            entity.setTea(39.99);
             entity.setCanUseInSimulation(true);
             entity.setVerificationStatus("VERIFIED_FROM_DATASET");
         }
