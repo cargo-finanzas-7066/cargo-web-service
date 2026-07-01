@@ -8,8 +8,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Profile;
 
 @Component
+@Profile("dev")
 @RequiredArgsConstructor
 public class VehicleCatalogSeedService implements CommandLineRunner {
     private final VehicleRepository vehicleRepository;
@@ -35,7 +37,7 @@ public class VehicleCatalogSeedService implements CommandLineRunner {
             vehicle.setModel(clean(node.path("model").asText()));
             vehicle.setYear(node.path("year").asInt(2026));
             vehicle.setCategory(clean(node.path("category").asText("Referencia")));
-            vehicle.setPrice(node.path("referencePrice").path("amount").asDouble(0));
+            vehicle.setPrice(node.path("referencePrice").path("amount").decimalValue());
             vehicle.setCurrency(node.path("referencePrice").path("currency").asText("PEN"));
             vehicle.setDealer(clean(node.path("dealer").asText()));
             vehicle.setDescription(clean(node.path("status").path("message").asText()));

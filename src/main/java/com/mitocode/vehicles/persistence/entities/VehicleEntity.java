@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Data;
+import java.time.OffsetDateTime;
+import java.math.BigDecimal;
 
 @Data
 @Entity
@@ -21,11 +23,14 @@ public class VehicleEntity {
     private String model;
     private Integer year;
     private String category;
-    private Double price;
+    @Column(precision=19, scale=2) private BigDecimal price;
     private String currency = "PEN";
     private String dealer;
     @Column(columnDefinition = "TEXT")
     private String description;
     private String imageUrl;
     private String status = "Disponible";
+    @Column(nullable = false) private Boolean active = true;
+    @Column(name = "created_at", insertable = false, updatable = false) private OffsetDateTime createdAt;
+    @Column(name = "updated_at", insertable = false, updatable = false) private OffsetDateTime updatedAt;
 }
