@@ -2,21 +2,22 @@ package com.mitocode.dto;
 
 import lombok.Data;
 import java.util.List;
+import java.math.BigDecimal;
 
 @Data
 public class SimulationResult {
-    private Double monthlyPayment;
-    private Double balloonAmount;
-    private Double tea;
-    private Double tem;
-    private Double van;
-    private Double tir;
-    private Double tcea;
-    private Double financedAmount;
-    private Double totalInterest;
-    private Double totalInsurance;
-    private Double totalCommissions;
-    private Double totalCreditCost;
-    private Double totalPayment;
+    private BigDecimal monthlyPayment;
+    private BigDecimal balloonAmount;
+    private BigDecimal tea;
+    private BigDecimal tem;
+    private BigDecimal van;
+    private BigDecimal tir;
+    private BigDecimal tcea;
+    private BigDecimal financedAmount;
+    private BigDecimal totalInterest;
+    private BigDecimal totalInsurance;
+    private BigDecimal totalCommissions;
+    private BigDecimal totalCreditCost;
+    private BigDecimal totalPayment;
     private List<PaymentRow> schedule;
 }

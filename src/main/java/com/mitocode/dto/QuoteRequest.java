@@ -4,12 +4,13 @@ import jakarta.validation.constraints.*;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
-public class SimulationRequest {
+public class QuoteRequest {
     @NotNull private Integer clientId;
     @NotNull private Integer vehicleId;
-    @NotNull private Integer financialProductId;
+    @NotEmpty private List<Integer> financialProductIds;
     @Positive private BigDecimal vehiclePrice;
     @NotNull @DecimalMin("0.0") @DecimalMax("100.0") private BigDecimal downPaymentPercent;
     @NotNull @Min(1) private Integer termMonths;
