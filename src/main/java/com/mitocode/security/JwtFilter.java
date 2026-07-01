@@ -12,18 +12,22 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
+import com.mitocode.iam.persistence.repositories.UserRepository;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @Component
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final UserRepository userRepository;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
 
-        return path.startsWith("/swagger-ui")
+        return path.startsWith("/api/v1/auth/")
+                || path.startsWith("/swagger-ui")
                 || path.startsWith("/v3/api-docs")
                 || path.startsWith("/swagger-resources")
                 || path.startsWith("/webjars")
@@ -42,15 +46,15 @@ public class JwtFilter extends OncePerRequestFilter {
             String token = header.substring(7);
 
             if (jwtUtil.validate(token)) {
-                String email = jwtUtil.getEmail(token);
-
-                var auth = new UsernamePasswordAuthenticationToken(
-                        email,
-                        null,
-                        Collections.emptyList()
-                );
-
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                userRepository.findById(jwtUtil.getUserId(token))
+                        .filter(user -> Boolean.TRUE.equals(user.getActive()))
+                        .ifPresent(user -> {
+                            var auth = new UsernamePasswordAuthenticationToken(
+                                    user.getEmail(), null,
+                                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
+                            auth.setDetails(user.getId());
+                            SecurityContextHolder.getContext().setAuthentication(auth);
+                        });
             }
         }
 

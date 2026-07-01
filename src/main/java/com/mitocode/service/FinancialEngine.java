@@ -1,192 +1,150 @@
 package com.mitocode.service;
 
+import com.mitocode.dto.GraceType;
 import com.mitocode.dto.PaymentRow;
 import com.mitocode.dto.SimulationResult;
+import com.mitocode.exception.UnprocessableEntityException;
+import com.mitocode.financialinstitutions.persistence.entities.FinancialProductEntity;
 import org.springframework.stereotype.Component;
 
+import java.math.*;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Component
 public class FinancialEngine {
+    private static final MathContext MC = new MathContext(20, RoundingMode.HALF_UP);
+    private static final BigDecimal HUNDRED = new BigDecimal("100");
+    private static final BigDecimal TWELVE = new BigDecimal("12");
+    private static final BigDecimal CENT = new BigDecimal("0.01");
 
-    private static final double RATE_SCALE = 10_000_000.0;
-    private static final double MONEY_SCALE = 100.0;
+    public record Input(BigDecimal vehiclePrice, BigDecimal downPaymentPercent, BigDecimal balloonPercent,
+                        int termMonths, GraceType graceType, int graceMonths, LocalDate firstPaymentDate,
+                        int paymentDay, FinancialProductEntity product) {}
 
-    public SimulationResult calculate(double vehiclePrice, double downPaymentPercent, double teaPercent,
-                                      int term, boolean balloonEnabled, double balloonAmount,
-                                      String graceType, int graceMonths, double insuranceDisbursementMonthlyPercent,
-                                      double vehicleInsuranceAnnualPercent, double portes,
-                                      LocalDate startDate, boolean isBcp) {
-        validateInput(term, balloonEnabled, graceMonths);
+    public SimulationResult calculate(Input input) {
+        validate(input);
+        var product = input.product();
+        BigDecimal monthlyRate = rate(Math.pow(1d + product.getTeaPercent().divide(HUNDRED, MC).doubleValue(), 1d / 12d) - 1d);
+        BigDecimal principal = input.vehiclePrice().multiply(BigDecimal.ONE.subtract(input.downPaymentPercent().divide(HUNDRED, MC)), MC);
+        BigDecimal balloon = input.vehiclePrice().multiply(input.balloonPercent().divide(HUNDRED, MC), MC);
+        BigDecimal lifeRate = product.getCreditLifeInsuranceMonthlyPercent().divide(HUNDRED, MC);
+        BigDecimal vehicleInsurance = input.vehiclePrice().multiply(product.getVehicleInsuranceAnnualPercent().divide(HUNDRED, MC), MC).divide(TWELVE, MC);
+        BigDecimal fee = product.getMonthlyFee();
+        BigDecimal upfrontCosts = product.getAdminCost().add(product.getNotaryCost()).add(product.getOtherUpfrontCost());
 
-        double effectivePortes = isBcp ? 0.0 : Math.max(0.0, portes);
-        double tea = teaPercent / 100.0;
-        double tem = roundRate(Math.pow(1.0 + tea, 1.0 / 12.0) - 1.0);
-        double downPaymentFactor = downPaymentPercent > 1.0 ? downPaymentPercent / 100.0 : downPaymentPercent;
-        double principal = vehiclePrice * (1.0 - downPaymentFactor);
-        double disbursementInsuranceRate = insuranceDisbursementMonthlyPercent / 100.0;
-        double vehicleInsuranceMonthly = (vehiclePrice * (vehicleInsuranceAnnualPercent / 100.0)) / 12.0;
-        double balloonPresentValue = balloonEnabled ? balloonAmount / Math.pow(1.0 + tem, term) : 0.0;
-        double amortizableCapital = principal - balloonPresentValue;
-        int regularPeriods = term - graceMonths;
-        double fixedPayment = annuityPayment(amortizableCapital, tem, regularPeriods);
+        BigDecimal balanceAfterGrace = principal;
+        for (int period = 1; period <= input.graceMonths(); period++) {
+            BigDecimal interest = balanceAfterGrace.multiply(monthlyRate, MC);
+            BigDecimal life = balanceAfterGrace.multiply(lifeRate, MC);
+            if (input.graceType() == GraceType.TOTAL) {
+                if (Boolean.TRUE.equals(product.getCapitalizeInterestTotalGrace())) balanceAfterGrace = balanceAfterGrace.add(interest);
+                if (Boolean.TRUE.equals(product.getCapitalizeInsuranceTotalGrace())) balanceAfterGrace = balanceAfterGrace.add(life);
+            }
+        }
+
+        int regularPeriods = input.termMonths() - input.graceMonths();
+        BigDecimal balloonPv = monthlyRate.signum() == 0 ? balloon : balloon.divide(BigDecimal.ONE.add(monthlyRate).pow(regularPeriods, MC), MC);
+        BigDecimal installment = annuity(balanceAfterGrace.subtract(balloonPv), monthlyRate, regularPeriods);
 
         List<PaymentRow> schedule = new ArrayList<>();
-        List<Double> flows = new ArrayList<>();
-        flows.add(principal);
+        List<BigDecimal> cashflows = new ArrayList<>();
+        cashflows.add(principal.subtract(upfrontCosts));
+        BigDecimal balance = principal;
 
-        String normalizedGrace = graceType == null ? "S" : graceType.trim().toUpperCase();
-        double balance = principal;
-        LocalDate firstPaymentDate = startDate == null ? LocalDate.now() : startDate;
+        for (int period = 1; period <= input.termMonths(); period++) {
+            BigDecimal initial = balance;
+            BigDecimal interest = initial.multiply(monthlyRate, MC);
+            BigDecimal life = initial.multiply(lifeRate, MC);
+            BigDecimal amortization = BigDecimal.ZERO;
+            BigDecimal basePayment = BigDecimal.ZERO;
+            BigDecimal balloonPayment = BigDecimal.ZERO;
+            BigDecimal paidLife = life;
 
-        for (int period = 1; period <= term; period++) {
-            double initialBalance = balance;
-            double interest = initialBalance * tem;
-            double disbursementInsurance = initialBalance * disbursementInsuranceRate;
-            double payment;
-            double amortization = 0.0;
-            boolean graceTotal = "T".equals(normalizedGrace) && period <= graceMonths;
-            boolean gracePartial = "P".equals(normalizedGrace) && period <= graceMonths;
-
-            if (graceTotal) {
-                payment = 0.0;
-                balance = initialBalance + interest + disbursementInsurance;
-            } else if (gracePartial) {
-                payment = interest + disbursementInsurance;
-                balance = initialBalance;
+            if (period <= input.graceMonths() && input.graceType() == GraceType.TOTAL) {
+                if (Boolean.TRUE.equals(product.getCapitalizeInterestTotalGrace())) balance = balance.add(interest); else basePayment = basePayment.add(interest);
+                if (Boolean.TRUE.equals(product.getCapitalizeInsuranceTotalGrace())) { balance = balance.add(life); paidLife = BigDecimal.ZERO; }
+            } else if (period <= input.graceMonths() && input.graceType() == GraceType.PARTIAL) {
+                basePayment = interest;
             } else {
-                payment = fixedPayment;
-                amortization = payment - interest;
-                balance = initialBalance - amortization;
+                amortization = installment.subtract(interest);
+                boolean last = period == input.termMonths();
+                if (last) {
+                    BigDecimal expected = balance.subtract(amortization).subtract(balloon);
+                    if (expected.abs().compareTo(CENT) > 0) {
+                        throw new UnprocessableEntityException("El cronograma deja un saldo residual de " + money(expected));
+                    }
+                    amortization = balance.subtract(balloon);
+                }
+                basePayment = interest.add(amortization);
+                balance = balance.subtract(amortization);
+                if (last) {
+                    balloonPayment = balloon;
+                    balance = balance.subtract(balloonPayment);
+                }
             }
 
-            double balloonPayment = period == term && balloonEnabled ? balloonAmount : 0.0;
-            if (period == term && !balloonEnabled) {
-                amortization += balance;
-                payment += balance;
-                balance = 0.0;
-            }
-            if (period == term && balloonEnabled) {
-                balance = Math.max(0.0, balance - balloonPayment);
-            }
-
-            double paidDisbursementInsurance = graceTotal || gracePartial ? 0.0 : disbursementInsurance;
-            double totalPayment = payment + balloonPayment + paidDisbursementInsurance + vehicleInsuranceMonthly + effectivePortes;
-            flows.add(-totalPayment);
-
-            PaymentRow row = new PaymentRow();
-            row.setPeriod(period);
-            row.setDate(firstPaymentDate.plusMonths(period));
-            row.setInitialBalance(money(initialBalance));
-            row.setPayment(money(payment));
-            row.setBalloonPayment(money(balloonPayment));
-            row.setInterest(money(interest));
-            row.setAmortization(money(amortization));
-            row.setInsurance(money(disbursementInsurance + vehicleInsuranceMonthly));
-            row.setCommission(money(effectivePortes));
-            row.setTotalPayment(money(totalPayment));
-            row.setFinalBalance(money(period == term ? 0.0 : Math.max(0.0, balance)));
-            schedule.add(row);
+            BigDecimal total = basePayment.add(paidLife).add(vehicleInsurance).add(fee).add(balloonPayment);
+            cashflows.add(total.negate());
+            schedule.add(row(period, dueDate(input.firstPaymentDate(), input.paymentDay(), period), initial, basePayment,
+                    balloonPayment, interest, amortization, paidLife.add(vehicleInsurance), fee, total, balance,
+                    period <= input.graceMonths() ? input.graceType() : GraceType.NONE));
         }
 
-        double van = presentValueOfPayments(schedule, tem) - principal;
-        double monthlyIrr = irr(flows, tem);
-        double tirAnnual = Math.pow(1.0 + monthlyIrr, 12.0) - 1.0;
-        double tcea = Math.max(tirAnnual, tea + 0.000001);
-        double totalPayment = schedule.stream().mapToDouble(PaymentRow::getTotalPayment).sum();
-        double totalInterest = schedule.stream().mapToDouble(PaymentRow::getInterest).sum();
-        double totalInsurance = schedule.stream().mapToDouble(PaymentRow::getInsurance).sum();
-        double totalCommissions = schedule.stream().mapToDouble(PaymentRow::getCommission).sum();
+        if (balance.abs().compareTo(CENT) > 0) throw new UnprocessableEntityException("El saldo final no es cero: " + money(balance));
+        BigDecimal monthlyIrr = irr(cashflows, monthlyRate);
+        BigDecimal annualIrr = rate(Math.pow(1d + monthlyIrr.doubleValue(), 12d) - 1d);
+        BigDecimal totalInterest = sum(schedule, PaymentRow::getInterest);
+        BigDecimal totalInsurance = sum(schedule, PaymentRow::getInsurance);
+        BigDecimal totalFees = sum(schedule, PaymentRow::getCommission).add(upfrontCosts);
+        BigDecimal periodicTotal = sum(schedule, PaymentRow::getTotalPayment);
+        BigDecimal totalPayment = periodicTotal.add(upfrontCosts);
 
-        SimulationResult result = new SimulationResult();
-        result.setMonthlyPayment(money(fixedPayment));
-        result.setBalloonAmount(money(balloonEnabled ? balloonAmount : 0.0));
-        result.setTea(roundRate(tea) * 100.0);
-        result.setTem(roundRate(tem) * 100.0);
-        result.setVan(money(van));
-        result.setTir(roundRate(tirAnnual) * 100.0);
-        result.setTcea(roundRate(tcea) * 100.0);
-        result.setFinancedAmount(money(principal));
-        result.setTotalInterest(money(totalInterest));
-        result.setTotalInsurance(money(totalInsurance));
-        result.setTotalCommissions(money(totalCommissions));
-        result.setTotalCreditCost(money(totalPayment - principal));
-        result.setTotalPayment(money(totalPayment));
-        result.setSchedule(schedule);
-        return result;
+        var result = new SimulationResult();
+        result.setMonthlyPayment(money(installment)); result.setBalloonAmount(money(balloon));
+        result.setTea(ratePercent(product.getTeaPercent())); result.setTem(ratePercent(monthlyRate.multiply(HUNDRED)));
+        result.setTir(ratePercent(annualIrr.multiply(HUNDRED))); result.setTcea(ratePercent(annualIrr.multiply(HUNDRED)));
+        result.setVan(money(npv(cashflows, monthlyRate))); result.setFinancedAmount(money(principal));
+        result.setTotalInterest(money(totalInterest)); result.setTotalInsurance(money(totalInsurance));
+        result.setTotalCommissions(money(totalFees)); result.setTotalCreditCost(money(totalPayment.subtract(principal)));
+        result.setTotalPayment(money(totalPayment)); result.setSchedule(schedule); return result;
     }
 
-    private void validateInput(int term, boolean balloonEnabled, int graceMonths) {
-        if (term <= 0) {
-            throw new IllegalArgumentException("El plazo debe ser mayor a cero");
-        }
-        if (balloonEnabled && term > 36) {
-            throw new IllegalArgumentException("La compra inteligente con cuota balón permite un plazo máximo de 36 meses");
-        }
-        if (graceMonths < 0 || graceMonths >= term) {
-            throw new IllegalArgumentException("Los meses de gracia deben ser menores al plazo total");
-        }
+    private void validate(Input i) {
+        if (i.vehiclePrice() == null || i.vehiclePrice().signum() <= 0) throw new IllegalArgumentException("El precio debe ser mayor a cero");
+        if (i.product() == null) throw new IllegalArgumentException("El producto financiero es obligatorio");
+        if (i.termMonths() < i.product().getMinTermMonths() || i.termMonths() > i.product().getMaxTermMonths()) throw new IllegalArgumentException("El plazo no está permitido por el producto");
+        if (i.graceMonths() < 0 || i.graceMonths() >= i.termMonths()) throw new IllegalArgumentException("La gracia debe ser menor al plazo total");
+        if (i.downPaymentPercent().compareTo(i.product().getMinDownPaymentPercent()) < 0 || i.downPaymentPercent().compareTo(i.product().getMaxDownPaymentPercent()) > 0) throw new IllegalArgumentException("La cuota inicial no está permitida por el producto");
+        if (i.balloonPercent().signum() < 0 || i.balloonPercent().compareTo(i.product().getMaxBalloonPercent()) > 0 || (i.balloonPercent().signum() > 0 && !Boolean.TRUE.equals(i.product().getBalloonAllowed()))) throw new IllegalArgumentException("La cuota balón no está permitida por el producto");
+        if (i.paymentDay() < 1 || i.paymentDay() > 28) throw new IllegalArgumentException("El día de pago debe estar entre 1 y 28");
     }
 
-    private double presentValueOfPayments(List<PaymentRow> schedule, double discountRate) {
-        double value = 0.0;
-        for (PaymentRow row : schedule) {
-            value += row.getTotalPayment() / Math.pow(1.0 + discountRate, row.getPeriod());
-        }
-        return value;
+    private PaymentRow row(int period, LocalDate date, BigDecimal initial, BigDecimal payment, BigDecimal balloon,
+                           BigDecimal interest, BigDecimal amortization, BigDecimal insurance, BigDecimal fee,
+                           BigDecimal total, BigDecimal end, GraceType grace) {
+        var r = new PaymentRow(); r.setPeriod(period); r.setDate(date); r.setInitialBalance(money(initial));
+        r.setPayment(money(payment)); r.setBalloonPayment(money(balloon)); r.setInterest(money(interest));
+        r.setAmortization(money(amortization)); r.setInsurance(money(insurance)); r.setCommission(money(fee));
+        r.setTotalPayment(money(total)); r.setFinalBalance(money(end)); r.setGraceType(grace.name()); return r;
     }
-
-    private double irr(List<Double> flows, double fallbackRate) {
-        double low = -0.99;
-        double high = 1.0;
-        double lowValue = npv(flows, low);
-        double highValue = npv(flows, high);
-        while (Math.signum(lowValue) == Math.signum(highValue) && high < 10.0) {
-            high *= 2.0;
-            highValue = npv(flows, high);
-        }
-        if (Math.signum(lowValue) == Math.signum(highValue)) {
-            return fallbackRate;
-        }
-        for (int iteration = 0; iteration < 200; iteration++) {
-            double mid = (low + high) / 2.0;
-            double value = npv(flows, mid);
-            if (Math.abs(value) < 0.0000001) {
-                return mid;
-            }
-            if (Math.signum(value) == Math.signum(lowValue)) {
-                low = mid;
-                lowValue = value;
-            } else {
-                high = mid;
-            }
-        }
-        return (low + high) / 2.0;
+    private BigDecimal annuity(BigDecimal capital, BigDecimal r, int n) {
+        if (r.signum() == 0) return capital.divide(BigDecimal.valueOf(n), MC);
+        BigDecimal factor = BigDecimal.ONE.add(r).pow(n, MC);
+        return capital.multiply(r.multiply(factor, MC), MC).divide(factor.subtract(BigDecimal.ONE), MC);
     }
-
-    private double npv(List<Double> flows, double rate) {
-        double value = 0.0;
-        for (int period = 0; period < flows.size(); period++) {
-            value += flows.get(period) / Math.pow(1.0 + rate, period);
-        }
-        return value;
+    private BigDecimal irr(List<BigDecimal> flows, BigDecimal fallback) {
+        double low=-0.9999, high=1.0; double lv=npvDouble(flows,low), hv=npvDouble(flows,high);
+        while (Math.signum(lv)==Math.signum(hv) && high<128) { high*=2; hv=npvDouble(flows,high); }
+        if (Math.signum(lv)==Math.signum(hv)) return fallback;
+        for(int x=0;x<250;x++){ double mid=(low+high)/2, value=npvDouble(flows,mid); if(Math.abs(value)<1e-9)return rate(mid); if(Math.signum(value)==Math.signum(lv)){low=mid;lv=value;}else high=mid; }
+        return rate((low+high)/2);
     }
-
-    private double annuityPayment(double capital, double rate, int periods) {
-        if (Math.abs(rate) < 0.0000001) {
-            return capital / periods;
-        }
-        double factor = Math.pow(1.0 + rate, periods);
-        return capital * ((rate * factor) / (factor - 1.0));
-    }
-
-    private double money(double value) {
-        return Math.round(value * MONEY_SCALE) / MONEY_SCALE;
-    }
-
-    private double roundRate(double value) {
-        return Math.round(value * RATE_SCALE) / RATE_SCALE;
-    }
+    private double npvDouble(List<BigDecimal> flows,double rate){double value=0;for(int i=0;i<flows.size();i++)value+=flows.get(i).doubleValue()/Math.pow(1+rate,i);return value;}
+    private BigDecimal npv(List<BigDecimal> flows, BigDecimal discount){BigDecimal v=BigDecimal.ZERO;for(int i=0;i<flows.size();i++)v=v.add(flows.get(i).divide(BigDecimal.ONE.add(discount).pow(i,MC),MC));return v;}
+    private BigDecimal sum(List<PaymentRow> rows, java.util.function.Function<PaymentRow,BigDecimal> f){return rows.stream().map(f).reduce(BigDecimal.ZERO,BigDecimal::add);}
+    private LocalDate dueDate(LocalDate first,int day,int period){return first.plusMonths(period-1L).withDayOfMonth(day);}
+    private BigDecimal money(BigDecimal v){return v.setScale(2,RoundingMode.HALF_UP);}
+    private BigDecimal rate(double v){return BigDecimal.valueOf(v).setScale(12,RoundingMode.HALF_UP);}
+    private BigDecimal ratePercent(BigDecimal v){return v.setScale(7,RoundingMode.HALF_UP);}
 }
