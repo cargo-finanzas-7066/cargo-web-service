@@ -1,46 +1,33 @@
 package com.mitocode.controller;
 
-import com.mitocode.dto.SimulationRequest;
-import com.mitocode.dto.SimulationResult;
-import com.mitocode.entity.SimulationEntity;
+import com.mitocode.dto.*;
 import com.mitocode.service.SimulationService;
+import com.mitocode.shared.paging.PageableFactory;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.*;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
-@RestController
-@RequestMapping("/api/simulations")
-@RequiredArgsConstructor
+@RestController @RequiredArgsConstructor
 public class SimulationController {
     private final SimulationService service;
 
-    @GetMapping
-    public List<SimulationEntity> getAll() { return service.findAll(); }
+    @PostMapping("/quotes")
+    public List<QuoteResource> quote(@Valid @RequestBody QuoteRequest request) { return service.quote(request); }
 
-    @GetMapping("/{id}")
-    public SimulationEntity getById(@PathVariable Integer id) { return service.findById(id); }
-
-    @PostMapping
-    public ResponseEntity<SimulationEntity> create(@RequestBody SimulationRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.save(req));
+    @PostMapping("/simulations")
+    public ResponseEntity<SimulationResource> save(@Valid @RequestBody SimulationRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.save(request));
     }
-
-    @PutMapping("/{id}")
-    public SimulationEntity update(@PathVariable Integer id, @RequestBody SimulationRequest req) {
-        req.setId(id);
-        return service.save(req);
+    @GetMapping("/simulations")
+    public Page<SimulationResource> findAll(@RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size,
+            @RequestParam(required=false) SimulationSortField sortBy, @RequestParam(defaultValue="ASC") Sort.Direction direction) {
+        return service.findAll(PageableFactory.of(page, size, sortBy, direction));
     }
-
-    @PostMapping("/{id}/calculate")
-    public SimulationResult calculate(@PathVariable Integer id) {
-        return service.calculate(id);
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Integer id) {
-        service.delete(id);
-        return ResponseEntity.noContent().build();
-    }
+    @GetMapping("/simulations/{id}")
+    public SimulationResource findById(@PathVariable Integer id) { return service.findById(id); }
+    @DeleteMapping("/simulations/{id}")
+    public ResponseEntity<Void> archive(@PathVariable Integer id) { service.archive(id); return ResponseEntity.noContent().build(); }
 }
