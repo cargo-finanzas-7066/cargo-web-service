@@ -28,6 +28,8 @@ class FinancialEngineTest {
         assertThat(result.getSchedule().get(35).getFinalBalance()).isEqualByComparingTo("0.00");
         assertThat(result.getSchedule().get(35).getBalloonPayment()).isEqualByComparingTo("9975.00");
         assertThat(result.getSchedule().subList(0,6)).allMatch(row -> row.getGraceType().equals("TOTAL"));
+        var paidInsurance = result.getSchedule().stream().map(row -> row.getInsurance()).reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertThat(result.getTotalInsurance()).isGreaterThan(paidInsurance);
     }
 
     @Test
@@ -49,6 +51,65 @@ class FinancialEngineTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("balón");
         assertThatThrownBy(() -> engine.calculate(input(p,"20000","20","0",72,GraceType.NONE,0)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("plazo");
+    }
+
+    @Test
+    void matchesReferenceSpreadsheetWhenInstallmentIncludesCreditLifeInsurance() {
+        var p=product("8.65");
+        p.setCreditLifeInsuranceMonthlyPercent(new BigDecimal("0.069"));
+        p.setVehicleInsuranceAnnualPercent(new BigDecimal("3.480"));
+        p.setMonthlyFee(new BigDecimal("10"));
+
+        var result=engine.calculate(input(p,"196305","20","0",36,GraceType.NONE,0));
+
+        assertThat(result.getFinancedAmount()).isEqualByComparingTo("157044.00");
+        assertThat(result.getMonthlyPayment()).isEqualByComparingTo("5005.14");
+        assertThat(result.getSchedule().get(0).getInterest()).isEqualByComparingTo("1089.48");
+        assertThat(result.getSchedule().get(0).getInsurance()).isEqualByComparingTo("677.64");
+        assertThat(result.getSchedule().get(0).getCreditLifeInsurance()).isEqualByComparingTo("108.36");
+        assertThat(result.getSchedule().get(0).getVehicleInsurance()).isEqualByComparingTo("569.28");
+        assertThat(result.getSchedule().get(0).getPayment()).isEqualByComparingTo("5005.14");
+        assertThat(result.getSchedule().get(0).getAmortization()).isEqualByComparingTo("3807.30");
+        assertThat(result.getSchedule().get(0).getTotalPayment()).isEqualByComparingTo("5584.42");
+        assertThat(result.getSchedule().get(35).getFinalBalance()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void matchesInterbankReferenceWithThreePartialGracePeriods() {
+        var p=product("14.49");
+        p.setCreditLifeInsuranceMonthlyPercent(new BigDecimal("0.038"));
+        p.setVehicleInsuranceAnnualPercent(new BigDecimal("3.400"));
+        p.setMonthlyFee(new BigDecimal("10"));
+
+        var result=engine.calculate(input(p,"67240.50","10","0",24,GraceType.PARTIAL,3));
+
+        var grace=result.getSchedule().get(0);
+        assertThat(grace.getInterest()).isEqualByComparingTo("686.27");
+        assertThat(grace.getCreditLifeInsurance()).isEqualByComparingTo("23.00");
+        assertThat(grace.getVehicleInsurance()).isEqualByComparingTo("190.51");
+        assertThat(grace.getPayment()).isEqualByComparingTo("686.27");
+        assertThat(grace.getAmortization()).isEqualByComparingTo("0.00");
+        assertThat(grace.getTotalPayment()).isEqualByComparingTo("909.78");
+
+        var firstRegular=result.getSchedule().get(3);
+        assertThat(firstRegular.getPayment()).isEqualByComparingTo("3267.67");
+        assertThat(firstRegular.getAmortization()).isEqualByComparingTo("2558.40");
+        assertThat(firstRegular.getTotalPayment()).isEqualByComparingTo("3468.19");
+        assertThat(result.getSchedule().get(23).getFinalBalance()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void rejectsBalloonThatWouldProduceNegativeInstallments() {
+        var p=product("12");
+        assertThatThrownBy(() -> engine.calculate(input(p,"20000","90","50",12,GraceType.NONE,0)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("demasiado alta");
+    }
+
+    @Test
+    void rejectsUpfrontCostsThatConsumeTheDisbursement() {
+        var p=product("12"); p.setAdminCost(new BigDecimal("2000"));
+        assertThatThrownBy(() -> engine.calculate(input(p,"2000","0","0",12,GraceType.NONE,0)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("costos iniciales");
     }
 
     private FinancialEngine.Input input(FinancialProductEntity p,String price,String down,String balloon,int term,GraceType grace,int graceMonths){

@@ -14,6 +14,8 @@ public class PaymentRow {
     private BigDecimal interest;
     private BigDecimal amortization;
     private BigDecimal insurance;
+    private BigDecimal creditLifeInsurance;
+    private BigDecimal vehicleInsurance;
     private BigDecimal commission;
     private BigDecimal totalPayment;
     private BigDecimal finalBalance;

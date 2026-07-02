@@ -302,8 +302,8 @@
           "type": "DEGRAVAMEN",
           "label": "Seguro de desgravamen individual",
           "required": true,
-          "ratePercentMonthly": 0.0375,
-          "displayValue": "0.0375% mensual",
+          "ratePercentMonthly": 0.038,
+          "displayValue": "0.038% mensual",
           "base": "SALDO_CAPITAL_MAS_INTERESES"
         },
         {
