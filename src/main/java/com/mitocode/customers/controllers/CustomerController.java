@@ -33,6 +33,7 @@ public class CustomerController {
 
     @PostMapping
     public ResponseEntity<CustomerResource> create(@Valid @RequestBody CustomerResource customer) {
+        customer.setId(null);
         return ResponseEntity.status(HttpStatus.CREATED).body(customerService.save(customer));
     }
 
