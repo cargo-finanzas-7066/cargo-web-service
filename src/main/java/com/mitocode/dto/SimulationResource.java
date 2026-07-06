@@ -26,6 +26,8 @@ public class SimulationResource {
     private BigDecimal monthlyPayment;
     private BigDecimal teaPercent;
     private BigDecimal temPercent;
+    private BigDecimal cokTeaPercent;
+    private BigDecimal cokTemPercent;
     private BigDecimal tirPercent;
     private BigDecimal tceaPercent;
     private BigDecimal van;

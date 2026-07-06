@@ -41,7 +41,8 @@ public class SimulationService {
         return request.getFinancialProductIds().stream().distinct().map(productId -> {
             FinancialProductEntity product = requireProduct(productId);
             var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
-                    request.getTermMonths(), request.getGraceType(), request.getGraceMonths(), request.getFirstPaymentDate(), request.getPaymentDay(), product);
+                    request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
+                    request.getFirstPaymentDate(), request.getPaymentDay(), product);
             var result = engine.calculate(input);
             var institution = product.getFinancialInstitution();
             return new QuoteResource(product.getId(), institution.getCode(), institution.getName(), product.getProductName(), product.getVersion(), result);
@@ -56,7 +57,8 @@ public class SimulationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
         FinancialProductEntity product = requireProduct(request.getFinancialProductId());
         var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
-                request.getTermMonths(), request.getGraceType(), request.getGraceMonths(), request.getFirstPaymentDate(), request.getPaymentDay(), product);
+                request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
+                request.getFirstPaymentDate(), request.getPaymentDay(), product);
         SimulationResult result = engine.calculate(input);
 
         var entity = new SimulationEntity();
@@ -69,7 +71,7 @@ public class SimulationService {
         entity.setDisbursementDate(input.firstPaymentDate().minusMonths(1)); entity.setPaymentDay(input.paymentDay());
         entity.setGraceType(input.graceType().name()); entity.setGraceMonths(input.graceMonths());
         entity.setBalloonEnabled(input.balloonPercent().signum() > 0); entity.setBalloonPercent(input.balloonPercent()); entity.setBalloonAmount(result.getBalloonAmount());
-        entity.setTea(result.getTea()); entity.setTem(result.getTem()); entity.setMonthlyPayment(result.getMonthlyPayment());
+        entity.setTea(result.getTea()); entity.setTem(result.getTem()); entity.setCokTea(result.getCokTeaPercent()); entity.setCokTem(result.getCokTemPercent()); entity.setMonthlyPayment(result.getMonthlyPayment());
         entity.setVan(result.getVan()); entity.setTir(result.getTir()); entity.setTcea(result.getTcea());
         entity.setTotalInterest(result.getTotalInterest()); entity.setTotalInsurance(result.getTotalInsurance());
         entity.setTotalFees(result.getTotalCommissions()); entity.setTotalPayment(result.getTotalPayment()); entity.setStatus("Guardado"); entity.setCreatedAt(LocalDate.now());
@@ -121,11 +123,11 @@ public class SimulationService {
         if (p.getValidFrom().isAfter(today) || (p.getValidUntil()!=null && p.getValidUntil().isBefore(today))) throw new UnprocessableEntityException("El producto financiero no está vigente");
         return p;
     }
-    private FinancialEngine.Input input(BigDecimal requestedPrice, VehicleEntity vehicle, BigDecimal down, BigDecimal balloon,
+    private FinancialEngine.Input input(BigDecimal requestedPrice, VehicleEntity vehicle, BigDecimal down, BigDecimal balloon, BigDecimal cokTea,
                                         int term, GraceType grace, int graceMonths, LocalDate first, int paymentDay, FinancialProductEntity product) {
         BigDecimal price = requestedPrice == null ? vehicle.getPrice() : requestedPrice;
         if (!product.getCurrency().equalsIgnoreCase(vehicle.getCurrency())) throw new UnprocessableEntityException("La moneda del vehículo no coincide con el producto");
-        return new FinancialEngine.Input(price, down, balloon, term, grace, graceMonths, first, paymentDay, product);
+        return new FinancialEngine.Input(price, down, balloon, cokTea, term, grace, graceMonths, first, paymentDay, product);
     }
     private Map<String,Object> snapshot(FinancialProductEntity p) {
         var i=p.getFinancialInstitution(); var map=new LinkedHashMap<String,Object>();
@@ -139,19 +141,21 @@ public class SimulationService {
         var e=new PaymentScheduleEntity(); e.setSimulationId(simulationId); e.setPeriod(r.getPeriod()); e.setDate(r.getDate());
         e.setInitialBalance(r.getInitialBalance()); e.setPayment(r.getPayment()); e.setBalloonPayment(r.getBalloonPayment());
         e.setInterest(r.getInterest()); e.setAmortization(r.getAmortization()); e.setInsurance(r.getInsurance()); e.setCommission(r.getCommission());
-        e.setTotalPayment(r.getTotalPayment()); e.setFinalBalance(r.getFinalBalance()); e.setGraceType(r.getGraceType()); return e;
+        e.setTotalPayment(r.getTotalPayment()); e.setFinalFlow(r.getFinalFlow()); e.setBaseFlow(r.getBaseFlow());
+        e.setFinalBalance(r.getFinalBalance()); e.setGraceType(r.getGraceType()); return e;
     }
     private PaymentRow row(PaymentScheduleEntity e) {
         var r=new PaymentRow(); r.setPeriod(e.getPeriod());r.setDate(e.getDate());r.setInitialBalance(e.getInitialBalance());r.setPayment(e.getPayment());
         r.setBalloonPayment(e.getBalloonPayment());r.setInterest(e.getInterest());r.setAmortization(e.getAmortization());r.setInsurance(e.getInsurance());
-        r.setCommission(e.getCommission());r.setTotalPayment(e.getTotalPayment());r.setFinalBalance(e.getFinalBalance());r.setGraceType(e.getGraceType());return r;
+        r.setCommission(e.getCommission());r.setTotalPayment(e.getTotalPayment());r.setFinalFlow(e.getFinalFlow());r.setBaseFlow(e.getBaseFlow());
+        r.setFinalBalance(e.getFinalBalance());r.setGraceType(e.getGraceType());return r;
     }
     private SimulationResource toResource(SimulationEntity e, List<PaymentRow> schedule) {
         var r=new SimulationResource(); r.setId(e.getId());r.setCode(e.getCode());r.setClientId(e.getClientId());r.setVehicleId(e.getVehicleId());
         r.setFinancialProductId(e.getFinancialProduct()==null?null:e.getFinancialProduct().getId());r.setCurrency(e.getCurrency());r.setVehiclePrice(e.getVehiclePrice());
         r.setDownPaymentPercent(e.getDownPaymentPercent());r.setFinancedAmount(e.getFinancedAmount());r.setTermMonths(e.getTerm());r.setFirstPaymentDate(e.getFirstPaymentDate());
         r.setPaymentDay(e.getPaymentDay());r.setGraceType(e.getGraceType());r.setGraceMonths(e.getGraceMonths());r.setBalloonPercent(e.getBalloonPercent());
-        r.setMonthlyPayment(e.getMonthlyPayment());r.setTeaPercent(e.getTea());r.setTemPercent(e.getTem());r.setTirPercent(e.getTir());r.setTceaPercent(e.getTcea());r.setVan(e.getVan());
+        r.setMonthlyPayment(e.getMonthlyPayment());r.setTeaPercent(e.getTea());r.setTemPercent(e.getTem());r.setCokTeaPercent(e.getCokTea());r.setCokTemPercent(e.getCokTem());r.setTirPercent(e.getTir());r.setTceaPercent(e.getTcea());r.setVan(e.getVan());
         r.setTotalInterest(e.getTotalInterest());r.setTotalInsurance(e.getTotalInsurance());r.setTotalFees(e.getTotalFees());r.setTotalPayment(e.getTotalPayment());
         r.setProductSnapshot(e.getProductSnapshot());r.setCreatedAt(e.getCreatedAtTimestamp());r.setSchedule(schedule);return r;
     }

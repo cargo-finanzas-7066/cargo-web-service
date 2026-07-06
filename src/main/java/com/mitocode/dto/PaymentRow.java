@@ -18,6 +18,8 @@ public class PaymentRow {
     private BigDecimal vehicleInsurance;
     private BigDecimal commission;
     private BigDecimal totalPayment;
+    private BigDecimal finalFlow;
+    private BigDecimal baseFlow;
     private BigDecimal finalBalance;
     private String graceType;
 }

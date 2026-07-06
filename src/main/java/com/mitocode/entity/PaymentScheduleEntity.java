@@ -23,6 +23,8 @@ public class PaymentScheduleEntity {
     private BigDecimal insurance;
     private BigDecimal commission;
     private BigDecimal totalPayment;
+    private BigDecimal finalFlow;
+    private BigDecimal baseFlow;
     private BigDecimal finalBalance;
     @Column(name="grace_type") private String graceType;
 }

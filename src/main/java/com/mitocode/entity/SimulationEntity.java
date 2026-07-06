@@ -39,6 +39,8 @@ public class SimulationEntity {
     private Integer term;
     private BigDecimal tea;
     private BigDecimal tem;
+    @Column(name="cok_tea") private BigDecimal cokTea;
+    @Column(name="cok_tem") private BigDecimal cokTem;
     private Integer paymentDay = 5;
     private LocalDate disbursementDate;
     @Column(name="first_payment_date") private LocalDate firstPaymentDate;

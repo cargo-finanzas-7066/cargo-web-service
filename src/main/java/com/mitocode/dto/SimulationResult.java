@@ -10,6 +10,8 @@ public class SimulationResult {
     private BigDecimal balloonAmount;
     private BigDecimal tea;
     private BigDecimal tem;
+    private BigDecimal cokTeaPercent;
+    private BigDecimal cokTemPercent;
     private BigDecimal van;
     private BigDecimal tir;
     private BigDecimal tcea;
