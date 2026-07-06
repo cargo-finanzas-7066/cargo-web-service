@@ -15,8 +15,11 @@ public class FinancialProductSeedService implements CommandLineRunner {
     private final FinancialInstitutionRepository institutions;
     private final FinancialProductRepository products;
     @Override public void run(String... args) {
-        institutions.findAll().stream().filter(i -> i.getCode()!=null && !products.existsByFinancialInstitutionId(i.getId())).forEach(i -> {
-            var p=new FinancialProductEntity();p.setFinancialInstitution(i);p.setProductName(i.getProduct()==null?"Crédito vehicular":i.getProduct());p.setVersion(1);
+        institutions.findAll().stream().filter(i -> i.getCode()!=null).forEach(i -> {
+            var existing = products.findFirstByFinancialInstitutionIdAndActiveTrueOrderByVersionDesc(i.getId());
+            var p=existing.orElseGet(FinancialProductEntity::new);
+            p.setFinancialInstitution(i);p.setProductName(i.getProduct()==null?"Crédito vehicular":i.getProduct());
+            if (p.getVersion()==null) p.setVersion(1);
             p.setCurrency(i.getCurrency()==null?"PEN":i.getCurrency());p.setTeaPercent(BigDecimal.valueOf(i.getTea()==null?0:i.getTea()));
             p.setMinTermMonths(i.getMinTerm()==null?1:i.getMinTerm());p.setMaxTermMonths(i.getMaxTerm()==null?60:i.getMaxTerm());
             p.setMinDownPaymentPercent(BigDecimal.valueOf(i.getMinDownPayment()==null?0:i.getMinDownPayment()));p.setMaxDownPaymentPercent(new BigDecimal("100"));

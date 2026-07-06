@@ -70,30 +70,35 @@ class FinancialEngineTest {
 
     @Test
     void matchesCapitalizandoReferenceWithCokAndBaseFlow() {
-        var p=product("9");
-        p.setMaxBalloonPercent(new BigDecimal("60"));
-        p.setCreditLifeInsuranceMonthlyPercent(new BigDecimal("0.077"));
-        p.setVehicleInsuranceAnnualPercent(new BigDecimal("4.86"));
+        var p=product("12.5");
+        p.setCreditLifeInsuranceMonthlyPercent(new BigDecimal("0.05"));
+        p.setVehicleInsuranceAnnualPercent(new BigDecimal("4.72"));
 
-        var result=engine.calculate(input(p,"50000","30","60","10",33,GraceType.PARTIAL,3));
+        var result=engine.calculate(input(p,"106915.50","20","50","13",33,GraceType.PARTIAL,3));
 
-        assertThat(result.getFinancedAmount()).isEqualByComparingTo("35000.00");
-        assertThat(result.getBalloonAmount()).isEqualByComparingTo("21000.00");
-        assertThat(result.getMonthlyPayment()).isEqualByComparingTo("697.56");
-        assertThat(result.getVan()).isEqualByComparingTo("-17.60");
+        assertThat(result.getFinancedAmount()).isEqualByComparingTo("85532.40");
+        assertThat(result.getBalloonAmount()).isEqualByComparingTo("42766.20");
+        assertThat(result.getMonthlyPayment()).isEqualByComparingTo("2129.38");
+        assertThat(result.getCokTemPercent()).isEqualByComparingTo("1.0236844");
+        assertThat(result.getVan()).isEqualByComparingTo("-636.43");
+        assertThat(result.getTir()).isEqualByComparingTo("1.6439375");
+        assertThat(result.getTcea()).isEqualByComparingTo("21.6123745");
 
         var grace=result.getSchedule().get(0);
-        assertThat(grace.getInterest()).isEqualByComparingTo("252.26");
-        assertThat(grace.getCreditLifeInsurance()).isEqualByComparingTo("26.95");
-        assertThat(grace.getVehicleInsurance()).isEqualByComparingTo("202.50");
-        assertThat(grace.getPayment()).isEqualByComparingTo("252.26");
-        assertThat(grace.getFinalBalance()).isEqualByComparingTo("35229.45");
+        assertThat(grace.getInterest()).isEqualByComparingTo("843.66");
+        assertThat(grace.getCreditLifeInsurance()).isEqualByComparingTo("42.77");
+        assertThat(grace.getVehicleInsurance()).isEqualByComparingTo("420.50");
+        assertThat(grace.getPayment()).isEqualByComparingTo("843.66");
+        assertThat(grace.getFinalBalance()).isEqualByComparingTo("85995.66");
 
         var firstRegular=result.getSchedule().get(3);
-        assertThat(firstRegular.getInterest()).isEqualByComparingTo("257.22");
-        assertThat(firstRegular.getAmortization()).isEqualByComparingTo("440.34");
-        assertThat(firstRegular.getPayment()).isEqualByComparingTo("927.01");
-        assertThat(result.getSchedule().get(32).getFinalBalance()).isEqualByComparingTo("0.00");
+        assertThat(firstRegular.getInterest()).isEqualByComparingTo("857.36");
+        assertThat(firstRegular.getAmortization()).isEqualByComparingTo("1272.02");
+        assertThat(firstRegular.getPayment()).isEqualByComparingTo("2592.65");
+        assertThat(firstRegular.getBaseFlow()).isEqualByComparingTo("-2129.38");
+        var last=result.getSchedule().get(32);
+        assertThat(last.getAmortization()).isEqualByComparingTo(last.getInitialBalance());
+        assertThat(last.getFinalBalance()).isEqualByComparingTo("0.00");
     }
 
     @Test

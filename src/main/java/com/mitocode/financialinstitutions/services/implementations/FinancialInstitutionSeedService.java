@@ -62,7 +62,9 @@ public class FinancialInstitutionSeedService implements CommandLineRunner {
 
             entity.setInsuranceDisbursement(findInsuranceMonthly(node, "DEGRAVAMEN"));
             entity.setInsuranceVehicle(findVehicleInsurance(node));
-            entity.setMonthlyFee(findMonthlyCharge(node));
+            // El Excel no incluye portes. El envío físico de estado de cuenta es opcional
+            // y no debe convertirse en un cargo mensual del producto.
+            entity.setMonthlyFee(0.0);
             entity.setAdminCost(0.0);
             entity.setRatesJson(objectMapper.writeValueAsString(node.path("rates")));
             entity.setInsurancesJson(objectMapper.writeValueAsString(node.path("insurances")));

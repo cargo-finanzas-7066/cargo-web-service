@@ -1,9 +1,8 @@
 FROM maven:3.9.11-eclipse-temurin-17 AS build
 WORKDIR /workspace
-COPY pom.xml mvnw mvnw.cmd ./
-COPY .mvn .mvn
+COPY pom.xml ./
 COPY src src
-RUN ./mvnw -q -Dmaven.test.skip=true package
+RUN mvn -q -Dmaven.test.skip=true package
 
 FROM eclipse-temurin:17-jre-jammy
 RUN apt-get update \

@@ -140,13 +140,15 @@ public class SimulationService {
     private PaymentScheduleEntity period(Integer simulationId, PaymentRow r) {
         var e=new PaymentScheduleEntity(); e.setSimulationId(simulationId); e.setPeriod(r.getPeriod()); e.setDate(r.getDate());
         e.setInitialBalance(r.getInitialBalance()); e.setPayment(r.getPayment()); e.setBalloonPayment(r.getBalloonPayment());
-        e.setInterest(r.getInterest()); e.setAmortization(r.getAmortization()); e.setInsurance(r.getInsurance()); e.setCommission(r.getCommission());
+        e.setInterest(r.getInterest()); e.setAmortization(r.getAmortization()); e.setInsurance(r.getInsurance());
+        e.setCreditLifeInsurance(r.getCreditLifeInsurance()); e.setVehicleInsurance(r.getVehicleInsurance()); e.setCommission(r.getCommission());
         e.setTotalPayment(r.getTotalPayment()); e.setFinalFlow(r.getFinalFlow()); e.setBaseFlow(r.getBaseFlow());
         e.setFinalBalance(r.getFinalBalance()); e.setGraceType(r.getGraceType()); return e;
     }
     private PaymentRow row(PaymentScheduleEntity e) {
         var r=new PaymentRow(); r.setPeriod(e.getPeriod());r.setDate(e.getDate());r.setInitialBalance(e.getInitialBalance());r.setPayment(e.getPayment());
         r.setBalloonPayment(e.getBalloonPayment());r.setInterest(e.getInterest());r.setAmortization(e.getAmortization());r.setInsurance(e.getInsurance());
+        r.setCreditLifeInsurance(e.getCreditLifeInsurance());r.setVehicleInsurance(e.getVehicleInsurance());
         r.setCommission(e.getCommission());r.setTotalPayment(e.getTotalPayment());r.setFinalFlow(e.getFinalFlow());r.setBaseFlow(e.getBaseFlow());
         r.setFinalBalance(e.getFinalBalance());r.setGraceType(e.getGraceType());return r;
     }

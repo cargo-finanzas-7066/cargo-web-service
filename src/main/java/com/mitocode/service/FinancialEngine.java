@@ -31,7 +31,11 @@ public class FinancialEngine {
         BigDecimal principal = input.vehiclePrice().multiply(BigDecimal.ONE.subtract(input.downPaymentPercent().divide(HUNDRED, MC)), MC);
         BigDecimal balloon = principal.multiply(input.balloonPercent().divide(HUNDRED, MC), MC);
         BigDecimal lifeRate = product.getCreditLifeInsuranceMonthlyPercent().divide(HUNDRED, MC);
-        BigDecimal vehicleInsurance = input.vehiclePrice().multiply(product.getVehicleInsuranceAnnualPercent().divide(HUNDRED, MC), MC).divide(TWELVE, MC);
+        // La seed expresa el seguro vehicular como tasa anual; el cronograma es mensual.
+        BigDecimal vehicleInsuranceMonthlyPercent = product.getVehicleInsuranceAnnualPercent()
+                .divide(TWELVE, 4, RoundingMode.HALF_UP);
+        BigDecimal vehicleInsurance = input.vehiclePrice()
+                .multiply(vehicleInsuranceMonthlyPercent.divide(HUNDRED, MC), MC);
         BigDecimal creditLifeInsurance = principal.multiply(lifeRate, MC);
         BigDecimal fee = BigDecimal.ZERO;
 
@@ -56,11 +60,14 @@ public class FinancialEngine {
         cashflows.add(principal);
         baseCashflows.add(principal);
         BigDecimal balance = principal;
+        BigDecimal totalInterestAccrued = BigDecimal.ZERO;
         BigDecimal totalInsuranceAccrued = BigDecimal.ZERO;
+        BigDecimal totalPaymentAccrued = BigDecimal.ZERO;
 
         for (int period = 1; period <= input.termMonths(); period++) {
             BigDecimal initial = balance;
             BigDecimal interest = initial.multiply(monthlyRate, MC);
+            totalInterestAccrued = totalInterestAccrued.add(interest);
             BigDecimal life = creditLifeInsurance;
             totalInsuranceAccrued = totalInsuranceAccrued.add(life).add(vehicleInsurance);
             BigDecimal amortization = BigDecimal.ZERO;
@@ -79,24 +86,28 @@ public class FinancialEngine {
                 paidLife = BigDecimal.ZERO;
                 paidVehicleInsurance = BigDecimal.ZERO;
             } else {
-                amortization = installment.subtract(interest);
+                BigDecimal scheduledAmortization = installment.subtract(interest);
                 boolean last = period == input.termMonths();
                 if (last) {
-                    BigDecimal expected = balance.subtract(amortization).subtract(balloon);
+                    BigDecimal expected = balance.subtract(scheduledAmortization).subtract(balloon);
                     if (expected.abs().compareTo(CENT) > 0) {
                         throw new UnprocessableEntityException("El cronograma deja un saldo residual de " + money(expected));
                     }
-                    amortization = balance.subtract(balloon);
-                }
-                basePayment = interest.add(amortization);
-                balance = balance.subtract(amortization);
-                if (last) {
+                    // El Excel presenta en la última fila toda la reducción de capital,
+                    // incluida la cuota balón, como amortización.
+                    amortization = balance;
+                    basePayment = installment;
                     balloonPayment = balloon;
-                    balance = balance.subtract(balloonPayment);
+                    balance = BigDecimal.ZERO;
+                } else {
+                    amortization = scheduledAmortization;
+                    basePayment = installment;
+                    balance = balance.subtract(amortization);
                 }
             }
 
             BigDecimal total = basePayment.add(paidLife).add(paidVehicleInsurance).add(balloonPayment);
+            totalPaymentAccrued = totalPaymentAccrued.add(total);
             cashflows.add(total.negate());
             BigDecimal baseFlow = baseCashflow(period, input, interest, installment, balloon).negate();
             baseCashflows.add(baseFlow);
@@ -111,17 +122,17 @@ public class FinancialEngine {
         if (balance.abs().compareTo(CENT) > 0) throw new UnprocessableEntityException("El saldo final no es cero: " + money(balance));
         BigDecimal monthlyIrr = irr(cashflows);
         BigDecimal annualIrr = BigDecimal.ONE.add(monthlyIrr).pow(12, MC).subtract(BigDecimal.ONE);
-        BigDecimal totalInterest = sum(schedule, PaymentRow::getInterest);
+        BigDecimal totalInterest = totalInterestAccrued;
         BigDecimal totalInsurance = totalInsuranceAccrued;
         BigDecimal totalFees = sum(schedule, PaymentRow::getCommission);
-        BigDecimal periodicTotal = sum(schedule, PaymentRow::getTotalPayment);
-        BigDecimal totalPayment = periodicTotal;
+        BigDecimal totalPayment = totalPaymentAccrued;
 
         var result = new SimulationResult();
         result.setMonthlyPayment(money(installment)); result.setBalloonAmount(money(balloon));
         result.setTea(ratePercent(product.getTeaPercent())); result.setTem(ratePercent(monthlyRate.multiply(HUNDRED)));
         result.setCokTeaPercent(ratePercent(cokTea)); result.setCokTemPercent(ratePercent(cokMonthlyRate.multiply(HUNDRED)));
-        result.setTir(ratePercent(annualIrr.multiply(HUNDRED))); result.setTcea(ratePercent(annualIrr.multiply(HUNDRED)));
+        // En la hoja, TIR es mensual y TCEA es la TIR mensual anualizada.
+        result.setTir(ratePercent(monthlyIrr.multiply(HUNDRED))); result.setTcea(ratePercent(annualIrr.multiply(HUNDRED)));
         result.setVan(money(npv(baseCashflows, cokMonthlyRate))); result.setFinancedAmount(money(principal));
         result.setTotalInterest(money(totalInterest)); result.setTotalInsurance(money(totalInsurance));
         result.setTotalCommissions(money(totalFees)); result.setTotalCreditCost(money(totalPayment.subtract(principal)));
