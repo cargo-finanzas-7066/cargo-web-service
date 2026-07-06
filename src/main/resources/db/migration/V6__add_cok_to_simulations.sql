@@ -1,0 +1,3 @@
+ALTER TABLE simulations
+    ADD COLUMN IF NOT EXISTS cok_tea NUMERIC(12, 7),
+    ADD COLUMN IF NOT EXISTS cok_tem NUMERIC(12, 7);

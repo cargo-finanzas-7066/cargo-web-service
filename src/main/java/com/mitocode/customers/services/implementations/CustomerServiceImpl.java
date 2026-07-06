@@ -9,35 +9,62 @@ import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import com.mitocode.iam.services.implementations.CurrentUserService;
+import com.mitocode.iam.persistence.entities.Role;
+import com.mitocode.exception.ResourceNotFoundException;
+import com.mitocode.exception.ConflictException;
 
 @Service
 @RequiredArgsConstructor
 public class CustomerServiceImpl implements CustomerService {
     private final CustomerRepository customerRepository;
+    private final CurrentUserService currentUserService;
 
     @Override
-    public List<CustomerResource> findAll() {
-        return customerRepository.findAll().stream()
-                .sorted(Comparator.comparing(CustomerEntity::getId))
-                .map(this::toResource)
-                .toList();
+    public Page<CustomerResource> findAll(Pageable pageable) {
+        var user = currentUserService.requireUser();
+        var page = user.getRole() == Role.ADMIN
+                ? customerRepository.findByArchivedFalse(pageable)
+                : customerRepository.findByOwnerIdAndArchivedFalse(user.getId(), pageable);
+        return page.map(this::toResource);
     }
 
     @Override
     public CustomerResource findById(Integer id) {
-        return customerRepository.findById(id)
+        var user = currentUserService.requireUser();
+        var found = user.getRole() == Role.ADMIN
+                ? customerRepository.findByIdAndArchivedFalse(id)
+                : customerRepository.findByIdAndOwnerIdAndArchivedFalse(id, user.getId());
+        return found
                 .map(this::toResource)
-                .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
     }
 
     @Override
     public CustomerResource save(CustomerResource customer) {
-        return toResource(customerRepository.save(toEntity(customer)));
+        var user = currentUserService.requireUser();
+        if (isNew(customer.getId()) && customerRepository.existsByOwnerIdAndDocTypeIgnoreCaseAndDocNumber(
+                user.getId(), customer.getDocType(), customer.getDocNumber())) {
+            throw new ConflictException("Ya existe un cliente con ese documento");
+        }
+        return toResource(customerRepository.save(toEntity(customer, user)));
+    }
+
+    private boolean isNew(Integer id) {
+        return id == null || id == 0;
     }
 
     @Override
     public void delete(Integer id) {
-        customerRepository.deleteById(id);
+        var user = currentUserService.requireUser();
+        var entity = user.getRole() == Role.ADMIN ? customerRepository.findByIdAndArchivedFalse(id)
+                : customerRepository.findByIdAndOwnerIdAndArchivedFalse(id, user.getId());
+        var customer = entity.orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
+        customer.setArchived(true);
+        customer.setStatus("Archivado");
+        customerRepository.save(customer);
     }
 
     private CustomerResource toResource(CustomerEntity entity) {
@@ -56,11 +83,12 @@ public class CustomerServiceImpl implements CustomerService {
         return resource;
     }
 
-    private CustomerEntity toEntity(CustomerResource resource) {
-        var entity = resource.getId() != null
-                ? customerRepository.findById(resource.getId()).orElse(new CustomerEntity())
-                : new CustomerEntity();
-        entity.setId(resource.getId());
+    private CustomerEntity toEntity(CustomerResource resource, com.mitocode.iam.persistence.entities.UserEntity user) {
+        var entity = isNew(resource.getId()) ? new CustomerEntity() : (user.getRole() == Role.ADMIN
+                ? customerRepository.findByIdAndArchivedFalse(resource.getId())
+                : customerRepository.findByIdAndOwnerIdAndArchivedFalse(resource.getId(), user.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
+        if (entity.getId() == null) entity.setOwner(user);
         entity.setDocType(resource.getDocType());
         entity.setDocNumber(resource.getDocNumber());
         entity.setNames(resource.getNames());
@@ -71,6 +99,7 @@ public class CustomerServiceImpl implements CustomerService {
         entity.setMonthlyIncome(resource.getMonthlyIncome());
         entity.setOccupation(resource.getOccupation());
         entity.setStatus(resource.getStatus() == null ? "Activo" : resource.getStatus());
+        entity.setArchived(false);
         return entity;
     }
 }

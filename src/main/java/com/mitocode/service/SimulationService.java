@@ -1,185 +1,164 @@
 package com.mitocode.service;
 
-import com.mitocode.dto.SimulationRequest;
-import com.mitocode.dto.SimulationResult;
-import com.mitocode.entity.PaymentScheduleEntity;
-import com.mitocode.entity.SimulationEntity;
-import com.mitocode.repository.PaymentScheduleRepository;
-import com.mitocode.repository.SimulationRepository;
-import com.mitocode.financialinstitutions.persistence.repositories.FinancialInstitutionRepository;
+import com.mitocode.customers.persistence.entities.CustomerEntity;
+import com.mitocode.customers.persistence.repositories.CustomerRepository;
+import com.mitocode.dto.*;
+import com.mitocode.entity.*;
+import com.mitocode.exception.*;
+import com.mitocode.financialinstitutions.persistence.entities.FinancialProductEntity;
+import com.mitocode.financialinstitutions.persistence.repositories.FinancialProductRepository;
+import com.mitocode.iam.persistence.entities.Role;
+import com.mitocode.iam.persistence.entities.UserEntity;
+import com.mitocode.iam.services.implementations.CurrentUserService;
+import com.mitocode.repository.*;
+import com.mitocode.vehicles.persistence.entities.VehicleEntity;
+import com.mitocode.vehicles.persistence.repositories.VehicleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.*;
 import java.time.LocalDate;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.*;
 
-@Service
-@RequiredArgsConstructor
+@Service @RequiredArgsConstructor
 public class SimulationService {
-    private final SimulationRepository simRepo;
-    private final PaymentScheduleRepository scheduleRepo;
+    private final SimulationRepository simulationRepository;
+    private final PaymentScheduleRepository scheduleRepository;
+    private final CustomerRepository customerRepository;
+    private final VehicleRepository vehicleRepository;
+    private final FinancialProductRepository productRepository;
+    private final CurrentUserService currentUserService;
     private final FinancialEngine engine;
-    private final FinancialInstitutionRepository financialInstitutionRepository;
 
-    public List<SimulationEntity> findAll() {
-        var unique = new LinkedHashMap<String, SimulationEntity>();
-        simRepo.findAll().stream()
-                .sorted(Comparator.comparing(SimulationEntity::getId, Comparator.nullsLast(Integer::compareTo)).reversed())
-                .forEach(simulation -> unique.putIfAbsent(fingerprint(simulation), simulation));
-        return unique.values().stream()
-                .sorted(Comparator.comparing(SimulationEntity::getId, Comparator.nullsLast(Integer::compareTo)).reversed())
-                .toList();
-    }
-    public SimulationEntity findById(Integer id) { return simRepo.findById(id).orElseThrow(); }
-
-    @Transactional
-    public SimulationEntity save(SimulationRequest req) {
-        SimulationEntity entity = req.getId() != null ? simRepo.findById(req.getId()).orElse(new SimulationEntity()) : new SimulationEntity();
-        entity.setClientId(req.getClientId());
-        entity.setVehicleId(req.getVehicleId());
-        entity.setEntityId(req.getEntityId());
-        entity.setCurrency(req.getCurrency());
-        double vehiclePrice = value(req.getVehiclePrice());
-        double downPayment = value(req.getDownPayment());
-        double downPaymentPercent = req.getDownPaymentPercent() != null
-                ? req.getDownPaymentPercent()
-                : (vehiclePrice == 0.0 ? 0.0 : (downPayment / vehiclePrice) * 100.0);
-        double tea = value(req.getTea());
-        entity.setVehiclePrice(vehiclePrice);
-        entity.setDownPayment(downPayment);
-        entity.setDownPaymentPercent(downPaymentPercent);
-        entity.setFinancedAmount(vehiclePrice - downPayment);
-        entity.setTerm(req.getTerm() == null ? 1 : req.getTerm());
-        entity.setTea(tea);
-        entity.setTem((Math.pow(1 + tea / 100.0, 1.0 / 12.0) - 1.0) * 100.0);
-        entity.setPaymentDay(req.getPaymentDay());
-        entity.setDisbursementDate(req.getDisbursementDate() == null ? LocalDate.now() : req.getDisbursementDate());
-        entity.setGraceType(normalizeGrace(req.getGraceType()));
-        entity.setGraceMonths(req.getGraceMonths() == null ? 0 : req.getGraceMonths());
-        entity.setBalloonEnabled(Boolean.TRUE.equals(req.getBalloonEnabled()));
-        entity.setBalloonAmount(value(req.getBalloonAmount()));
-        entity.setInsuranceDisbursement(value(req.getInsuranceDisbursement()));
-        entity.setInsuranceVehicle(value(req.getInsuranceVehicle()));
-        entity.setMonthlyFee(isBcp(req.getEntityId()) ? 0.0 : value(req.getMonthlyFee()));
-        entity.setAdminCost(value(req.getAdminCost()));
-        entity.setNotaryCost(value(req.getNotaryCost()));
-        entity.setOtherCharges(value(req.getOtherCharges()));
-        entity.setStatus(req.getStatus());
-        if (entity.getCode() == null) {
-            entity.setCreatedAt(LocalDate.now());
-        }
-        entity = simRepo.save(entity);
-        // generate code
-        if (entity.getCode() == null) {
-            entity.setCode(String.format("SIM-%04d", entity.getId()));
-            entity = simRepo.save(entity);
-        }
-        return entity;
+    @Transactional(readOnly = true)
+    public List<QuoteResource> quote(QuoteRequest request) {
+        UserEntity user = currentUserService.requireUser();
+        CustomerEntity client = requireClient(request.getClientId(), user);
+        VehicleEntity vehicle = vehicleRepository.findByIdAndActiveTrue(request.getVehicleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
+        return request.getFinancialProductIds().stream().distinct().map(productId -> {
+            FinancialProductEntity product = requireProduct(productId);
+            var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
+                    request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
+                    request.getFirstPaymentDate(), request.getPaymentDay(), product);
+            var result = engine.calculate(input);
+            var institution = product.getFinancialInstitution();
+            return new QuoteResource(product.getId(), institution.getCode(), institution.getName(), product.getProductName(), product.getVersion(), result);
+        }).toList();
     }
 
     @Transactional
-    public SimulationResult calculate(Integer simulationId) {
-        SimulationEntity sim = findById(simulationId);
-        scheduleRepo.deleteBySimulationId(simulationId);
-        double vehiclePrice = value(sim.getVehiclePrice());
-        double downPayment = value(sim.getDownPayment());
-        double downPaymentPercent = sim.getDownPaymentPercent() != null
-                ? sim.getDownPaymentPercent()
-                : (vehiclePrice == 0.0 ? 0.0 : (downPayment / vehiclePrice) * 100.0);
-        SimulationResult result = engine.calculate(
-                vehiclePrice, downPaymentPercent, value(sim.getTea()),
-                sim.getTerm() == null ? 1 : sim.getTerm(), Boolean.TRUE.equals(sim.getBalloonEnabled()), value(sim.getBalloonAmount()),
-                sim.getGraceType(), sim.getGraceMonths() == null ? 0 : sim.getGraceMonths(),
-                value(sim.getInsuranceDisbursement()), value(sim.getInsuranceVehicle()),
-                value(sim.getMonthlyFee()), sim.getDisbursementDate(), isBcp(sim.getEntityId())
-        );
+    public SimulationResource save(SimulationRequest request) {
+        UserEntity user = currentUserService.requireUser();
+        requireClient(request.getClientId(), user);
+        VehicleEntity vehicle = vehicleRepository.findByIdAndActiveTrue(request.getVehicleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
+        FinancialProductEntity product = requireProduct(request.getFinancialProductId());
+        var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
+                request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
+                request.getFirstPaymentDate(), request.getPaymentDay(), product);
+        SimulationResult result = engine.calculate(input);
 
-        List<PaymentScheduleEntity> schedules = result.getSchedule().stream().map(r -> {
-            PaymentScheduleEntity pse = new PaymentScheduleEntity();
-            pse.setSimulationId(simulationId);
-            pse.setPeriod(r.getPeriod());
-            pse.setDate(r.getDate());
-            pse.setInitialBalance(r.getInitialBalance());
-            pse.setPayment(r.getPayment());
-            pse.setBalloonPayment(r.getBalloonPayment());
-            pse.setInterest(r.getInterest());
-            pse.setAmortization(r.getAmortization());
-            pse.setInsurance(r.getInsurance());
-            pse.setCommission(r.getCommission());
-            pse.setTotalPayment(r.getTotalPayment());
-            pse.setFinalBalance(r.getFinalBalance());
-            return pse;
-        }).collect(Collectors.toList());
-        scheduleRepo.saveAll(schedules);
+        var entity = new SimulationEntity();
+        entity.setOwner(user); entity.setClientId(request.getClientId()); entity.setVehicleId(request.getVehicleId());
+        entity.setEntityId(product.getFinancialInstitution().getId()); entity.setFinancialProduct(product);
+        entity.setProductSnapshot(snapshot(product)); entity.setCurrency(product.getCurrency()); entity.setVehiclePrice(input.vehiclePrice());
+        entity.setDownPaymentPercent(input.downPaymentPercent());
+        entity.setDownPayment(input.vehiclePrice().multiply(input.downPaymentPercent()).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
+        entity.setFinancedAmount(result.getFinancedAmount()); entity.setTerm(input.termMonths()); entity.setFirstPaymentDate(input.firstPaymentDate());
+        entity.setDisbursementDate(input.firstPaymentDate().minusMonths(1)); entity.setPaymentDay(input.paymentDay());
+        entity.setGraceType(input.graceType().name()); entity.setGraceMonths(input.graceMonths());
+        entity.setBalloonEnabled(input.balloonPercent().signum() > 0); entity.setBalloonPercent(input.balloonPercent()); entity.setBalloonAmount(result.getBalloonAmount());
+        entity.setTea(result.getTea()); entity.setTem(result.getTem()); entity.setCokTea(result.getCokTeaPercent()); entity.setCokTem(result.getCokTemPercent()); entity.setMonthlyPayment(result.getMonthlyPayment());
+        entity.setVan(result.getVan()); entity.setTir(result.getTir()); entity.setTcea(result.getTcea());
+        entity.setTotalInterest(result.getTotalInterest()); entity.setTotalInsurance(result.getTotalInsurance());
+        entity.setTotalFees(result.getTotalCommissions()); entity.setTotalPayment(result.getTotalPayment()); entity.setStatus("Guardado"); entity.setCreatedAt(LocalDate.now());
+        entity = simulationRepository.save(entity);
+        entity.setCode("SIM-%06d".formatted(entity.getId()));
+        entity = simulationRepository.save(entity);
 
-        sim.setFinancedAmount(result.getFinancedAmount());
-        sim.setDownPaymentPercent(downPaymentPercent);
-        sim.setBalloonEnabled(Boolean.TRUE.equals(sim.getBalloonEnabled()));
-        sim.setBalloonAmount(value(sim.getBalloonAmount()));
-        sim.setTem(result.getTem());
-        sim.setMonthlyPayment(result.getMonthlyPayment());
-        sim.setVan(result.getVan());
-        sim.setTir(result.getTir());
-        sim.setTcea(result.getTcea());
-        sim.setStatus("Simulado");
-        simRepo.save(sim);
-
-        return result;
+        Integer id = entity.getId();
+        var periods = result.getSchedule().stream().map(row -> period(id, row)).toList();
+        scheduleRepository.saveAll(periods);
+        return toResource(entity, result.getSchedule());
     }
 
-    public void delete(Integer id) { simRepo.deleteById(id); }
-
-    private boolean isBcp(Integer entityId) {
-        if (entityId == null) {
-            return false;
-        }
-        return financialInstitutionRepository.findById(entityId)
-                .map(entity -> "BCP".equalsIgnoreCase(entity.getCode()) || entity.getShortName().toUpperCase().contains("BCP"))
-                .orElse(false);
+    @Transactional(readOnly = true)
+    public Page<SimulationResource> findAll(Pageable pageable) {
+        UserEntity user = currentUserService.requireUser();
+        Page<SimulationEntity> page = user.getRole() == Role.ADMIN ? simulationRepository.findByArchivedFalse(pageable)
+                : simulationRepository.findByOwnerIdAndArchivedFalse(user.getId(), pageable);
+        return page.map(entity -> toResource(entity, null));
     }
 
-    private String normalizeGrace(String graceType) {
-        if ("total".equalsIgnoreCase(graceType)) return "T";
-        if ("partial".equalsIgnoreCase(graceType)) return "P";
-        if ("none".equalsIgnoreCase(graceType)) return "S";
-        return graceType == null ? "S" : graceType;
+    @Transactional(readOnly = true)
+    public SimulationResource findById(Integer id) {
+        UserEntity user = currentUserService.requireUser();
+        var entity = accessible(id, user);
+        var rows = scheduleRepository.findBySimulationIdOrderByPeriod(id).stream().map(this::row).toList();
+        return toResource(entity, rows);
     }
 
-    private double value(Double value) {
-        return value == null ? 0.0 : value;
+    @Transactional
+    public void archive(Integer id) {
+        var entity = accessible(id, currentUserService.requireUser());
+        entity.setArchived(true); entity.setStatus("Archivado"); simulationRepository.save(entity);
     }
 
-    private String fingerprint(SimulationEntity simulation) {
-        double vehiclePrice = value(simulation.getVehiclePrice());
-        double downPayment = value(simulation.getDownPayment());
-        double downPaymentPercent = simulation.getDownPaymentPercent() != null
-                ? simulation.getDownPaymentPercent()
-                : (vehiclePrice == 0.0 ? 0.0 : (downPayment / vehiclePrice) * 100.0);
-        return String.join("|",
-                String.valueOf(simulation.getClientId()),
-                String.valueOf(simulation.getVehicleId()),
-                String.valueOf(simulation.getEntityId()),
-                String.valueOf(moneyKey(vehiclePrice)),
-                String.valueOf(moneyKey(downPayment)),
-                String.valueOf(rateKey(downPaymentPercent)),
-                String.valueOf(simulation.getTerm()),
-                String.valueOf(rateKey(value(simulation.getTea()))),
-                String.valueOf(simulation.getDisbursementDate()),
-                String.valueOf(normalizeGrace(simulation.getGraceType())),
-                String.valueOf(simulation.getGraceMonths() == null ? 0 : simulation.getGraceMonths()),
-                String.valueOf(Boolean.TRUE.equals(simulation.getBalloonEnabled())),
-                String.valueOf(moneyKey(value(simulation.getBalloonAmount())))
-        );
+    private SimulationEntity accessible(Integer id, UserEntity user) {
+        var value = user.getRole() == Role.ADMIN ? simulationRepository.findByIdAndArchivedFalse(id)
+                : simulationRepository.findByIdAndOwnerIdAndArchivedFalse(id, user.getId());
+        return value.orElseThrow(() -> new ResourceNotFoundException("Simulación no encontrada"));
     }
-
-    private long moneyKey(double value) {
-        return Math.round(value * 100.0);
+    private CustomerEntity requireClient(Integer id, UserEntity user) {
+        var value = user.getRole() == Role.ADMIN ? customerRepository.findByIdAndArchivedFalse(id)
+                : customerRepository.findByIdAndOwnerIdAndArchivedFalse(id, user.getId());
+        return value.orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
     }
-
-    private long rateKey(double value) {
-        return Math.round(value * 10_000.0);
+    private FinancialProductEntity requireProduct(Integer id) {
+        var p = productRepository.findByIdAndActiveTrue(id).orElseThrow(() -> new ResourceNotFoundException("Producto financiero no encontrado"));
+        LocalDate today = LocalDate.now();
+        if (p.getValidFrom().isAfter(today) || (p.getValidUntil()!=null && p.getValidUntil().isBefore(today))) throw new UnprocessableEntityException("El producto financiero no está vigente");
+        return p;
+    }
+    private FinancialEngine.Input input(BigDecimal requestedPrice, VehicleEntity vehicle, BigDecimal down, BigDecimal balloon, BigDecimal cokTea,
+                                        int term, GraceType grace, int graceMonths, LocalDate first, int paymentDay, FinancialProductEntity product) {
+        BigDecimal price = requestedPrice == null ? vehicle.getPrice() : requestedPrice;
+        if (!product.getCurrency().equalsIgnoreCase(vehicle.getCurrency())) throw new UnprocessableEntityException("La moneda del vehículo no coincide con el producto");
+        return new FinancialEngine.Input(price, down, balloon, cokTea, term, grace, graceMonths, first, paymentDay, product);
+    }
+    private Map<String,Object> snapshot(FinancialProductEntity p) {
+        var i=p.getFinancialInstitution(); var map=new LinkedHashMap<String,Object>();
+        map.put("financialProductId",p.getId()); map.put("institutionCode",i.getCode()); map.put("institutionName",i.getName());
+        map.put("productName",p.getProductName()); map.put("version",p.getVersion()); map.put("currency",p.getCurrency());
+        map.put("teaPercent",p.getTeaPercent()); map.put("creditLifeInsuranceMonthlyPercent",p.getCreditLifeInsuranceMonthlyPercent());
+        map.put("vehicleInsuranceAnnualPercent",p.getVehicleInsuranceAnnualPercent()); map.put("monthlyFee",p.getMonthlyFee());
+        map.put("adminCost",p.getAdminCost()); map.put("notaryCost",p.getNotaryCost()); map.put("otherUpfrontCost",p.getOtherUpfrontCost()); return map;
+    }
+    private PaymentScheduleEntity period(Integer simulationId, PaymentRow r) {
+        var e=new PaymentScheduleEntity(); e.setSimulationId(simulationId); e.setPeriod(r.getPeriod()); e.setDate(r.getDate());
+        e.setInitialBalance(r.getInitialBalance()); e.setPayment(r.getPayment()); e.setBalloonPayment(r.getBalloonPayment());
+        e.setInterest(r.getInterest()); e.setAmortization(r.getAmortization()); e.setInsurance(r.getInsurance());
+        e.setCreditLifeInsurance(r.getCreditLifeInsurance()); e.setVehicleInsurance(r.getVehicleInsurance()); e.setCommission(r.getCommission());
+        e.setTotalPayment(r.getTotalPayment()); e.setFinalFlow(r.getFinalFlow()); e.setBaseFlow(r.getBaseFlow());
+        e.setFinalBalance(r.getFinalBalance()); e.setGraceType(r.getGraceType()); return e;
+    }
+    private PaymentRow row(PaymentScheduleEntity e) {
+        var r=new PaymentRow(); r.setPeriod(e.getPeriod());r.setDate(e.getDate());r.setInitialBalance(e.getInitialBalance());r.setPayment(e.getPayment());
+        r.setBalloonPayment(e.getBalloonPayment());r.setInterest(e.getInterest());r.setAmortization(e.getAmortization());r.setInsurance(e.getInsurance());
+        r.setCreditLifeInsurance(e.getCreditLifeInsurance());r.setVehicleInsurance(e.getVehicleInsurance());
+        r.setCommission(e.getCommission());r.setTotalPayment(e.getTotalPayment());r.setFinalFlow(e.getFinalFlow());r.setBaseFlow(e.getBaseFlow());
+        r.setFinalBalance(e.getFinalBalance());r.setGraceType(e.getGraceType());return r;
+    }
+    private SimulationResource toResource(SimulationEntity e, List<PaymentRow> schedule) {
+        var r=new SimulationResource(); r.setId(e.getId());r.setCode(e.getCode());r.setClientId(e.getClientId());r.setVehicleId(e.getVehicleId());
+        r.setFinancialProductId(e.getFinancialProduct()==null?null:e.getFinancialProduct().getId());r.setCurrency(e.getCurrency());r.setVehiclePrice(e.getVehiclePrice());
+        r.setDownPaymentPercent(e.getDownPaymentPercent());r.setFinancedAmount(e.getFinancedAmount());r.setTermMonths(e.getTerm());r.setFirstPaymentDate(e.getFirstPaymentDate());
+        r.setPaymentDay(e.getPaymentDay());r.setGraceType(e.getGraceType());r.setGraceMonths(e.getGraceMonths());r.setBalloonPercent(e.getBalloonPercent());
+        r.setMonthlyPayment(e.getMonthlyPayment());r.setTeaPercent(e.getTea());r.setTemPercent(e.getTem());r.setCokTeaPercent(e.getCokTea());r.setCokTemPercent(e.getCokTem());r.setTirPercent(e.getTir());r.setTceaPercent(e.getTcea());r.setVan(e.getVan());
+        r.setTotalInterest(e.getTotalInterest());r.setTotalInsurance(e.getTotalInsurance());r.setTotalFees(e.getTotalFees());r.setTotalPayment(e.getTotalPayment());
+        r.setProductSnapshot(e.getProductSnapshot());r.setCreatedAt(e.getCreatedAtTimestamp());r.setSchedule(schedule);return r;
     }
 }

@@ -9,6 +9,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import com.mitocode.exception.ResourceNotFoundException;
+import com.mitocode.exception.ConflictException;
 
 @Service
 @RequiredArgsConstructor
@@ -16,28 +20,36 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleRepository vehicleRepository;
 
     @Override
-    public List<VehicleResource> findAll() {
-        return vehicleRepository.findAll().stream()
-                .sorted(Comparator.comparing(VehicleEntity::getBrand).thenComparing(VehicleEntity::getModel))
-                .map(this::toResource)
-                .toList();
+    public Page<VehicleResource> findAll(String brand, Pageable pageable) {
+        return vehicleRepository.findByActiveTrueAndBrandContainingIgnoreCase(brand, pageable).map(this::toResource);
     }
 
     @Override
     public VehicleResource findById(Integer id) {
-        return vehicleRepository.findById(id)
+        return vehicleRepository.findByIdAndActiveTrue(id)
                 .map(this::toResource)
-                .orElseThrow(() -> new IllegalArgumentException("Vehículo no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
     }
 
     @Override
     public VehicleResource save(VehicleResource vehicle) {
+        if (isNew(vehicle.getId()) && vehicleRepository.findByCode(vehicle.getCode()).isPresent()) {
+            throw new ConflictException("Ya existe un vehículo con ese código");
+        }
         return toResource(vehicleRepository.save(toEntity(vehicle)));
+    }
+
+    private boolean isNew(Integer id) {
+        return id == null || id == 0;
     }
 
     @Override
     public void delete(Integer id) {
-        vehicleRepository.deleteById(id);
+        var entity = vehicleRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
+        entity.setActive(false);
+        entity.setStatus("No disponible");
+        vehicleRepository.save(entity);
     }
 
     private VehicleResource toResource(VehicleEntity entity) {
@@ -58,10 +70,9 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     private VehicleEntity toEntity(VehicleResource resource) {
-        var entity = resource.getId() != null
-                ? vehicleRepository.findById(resource.getId()).orElse(new VehicleEntity())
-                : new VehicleEntity();
-        entity.setId(resource.getId());
+        var entity = isNew(resource.getId())
+                ? new VehicleEntity()
+                : vehicleRepository.findByIdAndActiveTrue(resource.getId()).orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
         entity.setCode(resource.getCode());
         entity.setBrand(resource.getBrand());
         entity.setModel(resource.getModel());
@@ -73,6 +84,7 @@ public class VehicleServiceImpl implements VehicleService {
         entity.setDescription(resource.getDescription());
         entity.setImageUrl(resource.getImageUrl());
         entity.setStatus(resource.getStatus() == null ? "Disponible" : resource.getStatus());
+        entity.setActive(true);
         return entity;
     }
 }

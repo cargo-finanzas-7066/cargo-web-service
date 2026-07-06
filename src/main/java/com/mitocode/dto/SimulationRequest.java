@@ -1,31 +1,24 @@
 package com.mitocode.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import jakarta.validation.constraints.*;
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
 public class SimulationRequest {
-    private Integer id;
-    private Integer clientId;
-    private Integer vehicleId;
-    private Integer entityId;
-    private String currency = "PEN";
-    private Double vehiclePrice;
-    private Double downPayment;
-    private Double downPaymentPercent = 20.0;
-    private Integer term;
-    private Double tea;
-    private Integer paymentDay = 5;
-    private LocalDate disbursementDate;
-    private String graceType = "none";
-    private Integer graceMonths = 0;
-    private Boolean balloonEnabled = false;
-    private Double balloonAmount = 0.0;
-    private Double insuranceDisbursement = 0.05;
-    private Double insuranceVehicle = 3.5;
-    private Double monthlyFee = 0.0;
-    private Double adminCost = 0.0;
-    private Double notaryCost = 0.0;
-    private Double otherCharges = 0.0;
-    private String status = "Borrador";
+    @NotNull private Integer clientId;
+    @NotNull private Integer vehicleId;
+    @NotNull private Integer financialProductId;
+    @Positive private BigDecimal vehiclePrice;
+    @NotNull @DecimalMin("0.0") @DecimalMax("100.0") private BigDecimal downPaymentPercent;
+    @NotNull @Min(1) private Integer termMonths;
+    @JsonAlias({"cok", "cokTea", "cokPercent", "discountRate", "discountRatePercent", "tasaDescuento", "tasaDescuentoPercent"})
+    @NotNull @DecimalMin("0.0") private BigDecimal cokTeaPercent;
+    @NotNull private LocalDate firstPaymentDate;
+    @NotNull @Min(1) @Max(28) private Integer paymentDay;
+    @NotNull private GraceType graceType = GraceType.NONE;
+    @NotNull @Min(0) private Integer graceMonths = 0;
+    @NotNull @DecimalMin("0.0") @DecimalMax("99.9999") private BigDecimal balloonPercent = BigDecimal.ZERO;
 }

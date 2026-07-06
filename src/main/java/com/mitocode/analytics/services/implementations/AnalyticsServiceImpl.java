@@ -1,54 +1,46 @@
 package com.mitocode.analytics.services.implementations;
 
-import com.mitocode.analytics.controllers.dtos.DashboardResource;
-import com.mitocode.analytics.controllers.dtos.RecentActivityResource;
-import com.mitocode.analytics.persistence.repositories.AnalyticsRepository;
+import com.mitocode.analytics.controllers.dtos.*;
 import com.mitocode.analytics.services.interfaces.AnalyticsService;
+import com.mitocode.customers.persistence.repositories.CustomerRepository;
+import com.mitocode.financialinstitutions.persistence.repositories.FinancialInstitutionRepository;
+import com.mitocode.iam.persistence.entities.Role;
+import com.mitocode.iam.services.implementations.CurrentUserService;
+import com.mitocode.repository.SimulationRepository;
 import com.mitocode.vehicles.controllers.dtos.VehicleResource;
 import com.mitocode.vehicles.persistence.entities.VehicleEntity;
+import com.mitocode.vehicles.persistence.repositories.VehicleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
-@Service
-@RequiredArgsConstructor
+@Service @RequiredArgsConstructor
 public class AnalyticsServiceImpl implements AnalyticsService {
-    private final AnalyticsRepository analyticsRepository;
+    private final SimulationRepository simulationRepository;
+    private final CustomerRepository customerRepository;
+    private final VehicleRepository vehicleRepository;
+    private final FinancialInstitutionRepository institutionRepository;
+    private final CurrentUserService currentUserService;
 
-    @Override
+    @Override @Transactional(readOnly=true)
     public DashboardResource getDashboard() {
-        var totalSimulations = Math.max(analyticsRepository.countSimulations(), 1284L);
-        var totalClients = Math.max(analyticsRepository.countClients(), 856L);
-        var recentVehicles = analyticsRepository.findRecentVehicles().stream()
-                .map(this::toVehicleResource)
-                .toList();
-
-        return new DashboardResource(totalSimulations, totalClients, recentActivities(), recentVehicles);
+        var user=currentUserService.requireUser(); boolean admin=user.getRole()==Role.ADMIN;
+        long simulations=admin?simulationRepository.countByArchivedFalse():simulationRepository.countByOwnerIdAndArchivedFalse(user.getId());
+        long clients=admin?customerRepository.countByArchivedFalse():customerRepository.countByOwnerIdAndArchivedFalse(user.getId());
+        var page=admin?simulationRepository.findByArchivedFalseOrderByCreatedAtTimestampDesc(PageRequest.of(0,4))
+                :simulationRepository.findByOwnerIdAndArchivedFalseOrderByCreatedAtTimestampDesc(user.getId(),PageRequest.of(0,4));
+        var activities=page.stream().map(s->{
+            var c=customerRepository.findById(s.getClientId()).orElse(null);var v=vehicleRepository.findById(s.getVehicleId()).orElse(null);
+            var i=s.getEntityId()==null?null:institutionRepository.findById(s.getEntityId()).orElse(null);
+            return new RecentActivityResource(c==null?"Cliente":c.getNames()+" "+c.getSurnames(),v==null?"Vehículo":v.getBrand()+" "+v.getModel(),
+                    i==null?"Entidad":i.getShortName(),s.getFinancedAmount(),s.getTea(),s.getTcea(),s.getMonthlyPayment());
+        }).toList();
+        var vehicles=vehicleRepository.findByActiveTrue(PageRequest.of(0,3)).stream().map(this::vehicle).toList();
+        return new DashboardResource(simulations,clients,activities,vehicles);
     }
-
-    private List<RecentActivityResource> recentActivities() {
-        return List.of(
-                new RecentActivityResource("Ricardo Palma", "Toyota Hilux 2024", "BCP", 45000.0, 12.50, 14.20, 1450.0),
-                new RecentActivityResource("Elena García", "Hyundai Santa Fe", "Interbank", 62300.0, 11.80, 13.50, 1980.0),
-                new RecentActivityResource("Juan Pérez", "Kia Sportage", "BBVA", 38500.0, 13.20, 15.10, 1250.0),
-                new RecentActivityResource("Carmen Rosa", "Nissan Sentra", "Scotiabank", 29900.0, 14.00, 16.40, 980.0)
-        );
-    }
-
-    private VehicleResource toVehicleResource(VehicleEntity entity) {
-        var resource = new VehicleResource();
-        resource.setId(entity.getId());
-        resource.setBrand(entity.getBrand());
-        resource.setModel(entity.getModel());
-        resource.setYear(entity.getYear());
-        resource.setCategory(entity.getCategory());
-        resource.setPrice(entity.getPrice());
-        resource.setCurrency(entity.getCurrency());
-        resource.setDealer(entity.getDealer());
-        resource.setDescription(entity.getDescription());
-        resource.setImageUrl(entity.getImageUrl());
-        resource.setStatus(entity.getStatus());
-        return resource;
-    }
+    private VehicleResource vehicle(VehicleEntity e){var r=new VehicleResource();r.setId(e.getId());r.setCode(e.getCode());r.setBrand(e.getBrand());r.setModel(e.getModel());
+        r.setYear(e.getYear());r.setCategory(e.getCategory());r.setPrice(e.getPrice());r.setCurrency(e.getCurrency());r.setDealer(e.getDealer());r.setDescription(e.getDescription());
+        r.setImageUrl(e.getImageUrl());r.setStatus(e.getStatus());return r;}
 }

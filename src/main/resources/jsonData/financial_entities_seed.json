@@ -64,18 +64,18 @@
       "insurances": [
         {
           "type": "DEGRAVAMEN",
-          "label": "Seguro de desgravamen",
+          "label": "Seguro de desgravamen individual",
           "required": true,
-          "ratePercentMonthly": null,
-          "displayValue": "Obligatorio; tasa según póliza vigente",
+          "ratePercentMonthly": 0.050,
+          "displayValue": "0.050% mensual (mínimo referencial; varía según perfil de riesgo del cliente)",
           "base": "SALDO_DEUDOR"
         },
         {
           "type": "VEHICULAR",
-          "label": "Seguro vehicular",
+          "label": "Seguro vehicular (riesgo 1)",
           "required": true,
-          "ratePercentAnnual": null,
-          "displayValue": "Obligatorio durante todo el plazo del crédito",
+          "ratePercentAnnual": 4.72,
+          "displayValue": "4.72% anual (riesgo 1); varía según categoría de riesgo del vehículo",
           "base": "VALOR_VEHICULO"
         }
       ],
@@ -93,10 +93,10 @@
           "type": "PHYSICAL_STATEMENT_DELIVERY",
           "label": "Envío físico de estado de cuenta",
           "applies": "OPTIONAL",
-          "amount": null,
+          "amount": 10.0,
           "currency": "PEN",
           "frequency": "MONTHLY",
-          "displayValue": "Solo si el cliente elige estado de cuenta físico; electrónico sin costo"
+          "displayValue": "S/ 10.00; electrónico sin costo"
         },
         {
           "type": "POLICY_ENDORSEMENT_EVALUATION",
@@ -111,12 +111,13 @@
       "verification": {
         "status": "VERIFIED",
         "confidence": "HIGH",
-        "sourceName": "BCP - Compra Inteligente y Hoja Resumen",
+        "sourceName": "BCP - Compra Inteligente, Fórmulas y Ejemplos, y Hoja Resumen",
         "sourceUrls": [
           "https://www.viabcp.com/creditos/credito-vehicular/compra-inteligente",
+          "https://www.viabcp.com/wcm/connect/fefb2800-abf8-4767-a205-0ebb428441a8/Formulas+y+Ejemplos+de+Compra+Inteligente+BCP.pdf",
           "https://www.viabcp.com/wcm/connect/b06777a1-b265-4f0a-bd41-274651e289e3/HojaResumenYCronograma.pdf?CVID=pVQvLHc&MOD=AJPERES&attachment=false&id=1780084857678"
         ],
-        "observation": "Corregir pantalla: no mostrar 'Portes S/ 10.00' como cargo fijo obligatorio. Mostrar 'Envío físico de estado de cuenta' opcional."
+        "observation": "Tasas de seguro (0.050% desgravamen, 4.72% vehicular riesgo 1) verificadas del PDF oficial 'Fórmulas y Ejemplos de Compra Inteligente BCP'. Corregir pantalla: no mostrar 'Portes S/ 10.00' como cargo fijo obligatorio, sino 'Envío físico de estado de cuenta' opcional."
       }
     },
     {
@@ -301,8 +302,8 @@
           "type": "DEGRAVAMEN",
           "label": "Seguro de desgravamen individual",
           "required": true,
-          "ratePercentMonthly": 0.0375,
-          "displayValue": "0.0375% mensual",
+          "ratePercentMonthly": 0.038,
+          "displayValue": "0.038% mensual",
           "base": "SALDO_CAPITAL_MAS_INTERESES"
         },
         {
@@ -370,398 +371,13 @@
       "verification": {
         "status": "VERIFIED",
         "confidence": "MEDIUM_HIGH",
-        "sourceName": "Interbank - Documentos vigentes y Tarifario Vehicular",
+        "sourceName": "Interbank - Documentos vigentes, Tarifario Vehicular y Cuota Balloon",
         "sourceUrls": [
           "https://interbank.pe/centro-de-ayuda/credito-vehicular/conoce-los-documentos-vigentes",
+          "https://interbank.pe/centro-de-ayuda/credito-vehicular/que-es-la-cuota-balloon",
           "https://content-us-2.content-cms.com/9b3f67ef-5a9f-4acc-8ce8-bcc27fa681c7/dxdam/41/4177be04-2b7d-4ec2-8bcf-e057ead875f4/Tarifario%20Vehicular.pdf"
         ],
         "observation": "El PDF indica información actualizada a diciembre 2021, pero está enlazado desde la página actual de documentos vigentes."
-      }
-    },
-    {
-      "code": "SCOTIABANK",
-      "displayOrder": 4,
-      "name": "Scotiabank Perú",
-      "shortName": "Scotiabank",
-      "type": "Banco",
-      "logoText": "SBT",
-      "currency": "PEN",
-      "creditType": "VEHICULAR_TRADICIONAL",
-      "productName": "Préstamo Vehicular Scotiabank",
-      "isVisible": true,
-      "canUseInSimulation": true,
-      "summary": {
-        "teaPublishedLabel": "8.99% - 15.99%",
-        "minimumInitialLabel": "Desde 10% aprox.",
-        "maximumFinancingLabel": "80% ref.",
-        "termLabel": "Según evaluación",
-        "graceLabel": "No publicado",
-        "insuranceSummaryLabel": "Desgravamen / Vehicular",
-        "chargesSummaryLabel": "EE.CC. físico opcional"
-      },
-      "conditions": {
-        "minimumDownPaymentPercent": 20.0,
-        "maximumFinancingPercent": 80.0,
-        "minTermMonths": null,
-        "maxTermMonths": null,
-        "allowedTermMonths": null,
-        "maxGraceMonths": null,
-        "maxGraceDays": null,
-        "balloonAllowed": false,
-        "defaultPhysicalStatement": false
-      },
-      "rates": [
-        {
-          "label": "Préstamo vehicular - tramo 1",
-          "currency": "PEN",
-          "rateType": "TEA",
-          "minPercent": 8.99,
-          "maxPercent": 14.99,
-          "calculationBaseDays": 360
-        },
-        {
-          "label": "Préstamo vehicular - tramo 2 / TCEA máxima referencial",
-          "currency": "PEN",
-          "rateType": "TEA",
-          "minPercent": 9.99,
-          "maxPercent": 15.99,
-          "calculationBaseDays": 360
-        }
-      ],
-      "insurances": [
-        {
-          "type": "DEGRAVAMEN",
-          "label": "Seguro de desgravamen",
-          "required": false,
-          "ratePercentMonthly": 0.1045,
-          "displayValue": "0.1045% mensual ref.",
-          "base": "SALDO_DEUDOR"
-        },
-        {
-          "type": "DEGRAVAMEN_CON_DEVOLUCION",
-          "label": "Seguro de desgravamen con devolución",
-          "required": false,
-          "ratePercentMonthly": 0.1358,
-          "displayValue": "0.1358% mensual ref.",
-          "base": "SALDO_DEUDOR"
-        },
-        {
-          "type": "VEHICULAR",
-          "label": "Seguro del bien / vehicular",
-          "required": true,
-          "ratePercentMonthly": 0.5064,
-          "displayValue": "0.5064% mensual ref.",
-          "base": "VALOR_VEHICULO"
-        }
-      ],
-      "charges": [
-        {
-          "type": "PORTES",
-          "label": "Portes",
-          "applies": false,
-          "amount": 0,
-          "currency": "PEN",
-          "frequency": "MONTHLY",
-          "displayValue": "No usar como 'portes'"
-        },
-        {
-          "type": "PHYSICAL_STATEMENT_DELIVERY",
-          "label": "Envío físico de estado de cuenta",
-          "applies": "OPTIONAL",
-          "amount": 11.0,
-          "currency": "PEN",
-          "amountAlt": 4.0,
-          "currencyAlt": "USD",
-          "frequency": "MONTHLY",
-          "displayValue": "S/ 11.00 o US$ 4.00; virtual exonerado"
-        },
-        {
-          "type": "POLICY_ENDORSEMENT_EVALUATION",
-          "label": "Evaluación de póliza vehicular endosada",
-          "applies": "OPTIONAL",
-          "amount": 200.0,
-          "currency": "PEN",
-          "amountAlt": 50.0,
-          "currencyAlt": "USD",
-          "frequency": "POLICY_RENEWAL",
-          "displayValue": "S/ 200.00 o US$ 50.00"
-        },
-        {
-          "type": "NOTARY_EXPENSES",
-          "label": "Gastos notariales",
-          "applies": "VARIABLE",
-          "displayValue": "Según tarifario de notaría"
-        },
-        {
-          "type": "REGISTRY_EXPENSES",
-          "label": "Gastos registrales",
-          "applies": "VARIABLE",
-          "displayValue": "Según SUNARP / Registros Públicos"
-        }
-      ],
-      "verification": {
-        "status": "VERIFIED",
-        "confidence": "HIGH",
-        "sourceName": "Scotiabank Perú - Préstamo Vehicular y Tarifario CAT 08",
-        "sourceUrls": [
-          "https://www.scotiabank.com.pe/Personas/Prestamos/Creditos/Vehicular",
-          "https://cdn.aglty.io/scotiabank-peru/PDFs/personas/prestamos/vehicular/27-Prestamo-Vehicular-CAT-08.pdf"
-        ],
-        "observation": "El tarifario tiene última actualización 08.09.2025."
-      }
-    },
-    {
-      "code": "SANTANDER_CONSUMER",
-      "displayOrder": 5,
-      "name": "Santander Consumer Perú",
-      "shortName": "Santander Consumer",
-      "type": "Empresa de Créditos",
-      "logoText": "SC",
-      "currency": "PEN",
-      "creditType": "VEHICULAR_TRADICIONAL_COMPRA_MAESTRA_5050",
-      "productName": "Crédito Vehicular Santander Consumer",
-      "isVisible": true,
-      "canUseInSimulation": true,
-      "summary": {
-        "teaPublishedLabel": "Desde 7.99% / Plan 50|50 desde 0%",
-        "minimumInitialLabel": "Según plan",
-        "maximumFinancingLabel": "Según evaluación",
-        "termLabel": "Hasta 60 meses / Compra Maestra 2 o 3 años",
-        "graceLabel": "No publicado",
-        "insuranceSummaryLabel": "Desgravamen / Vehicular / GPS según plan",
-        "chargesSummaryLabel": "EE.CC. físico según ejemplo"
-      },
-      "conditions": {
-        "minimumDownPaymentPercent": null,
-        "maximumFinancingPercent": null,
-        "minTermMonths": 12,
-        "maxTermMonths": 60,
-        "allowedTermMonths": null,
-        "maxGraceMonths": null,
-        "maxGraceDays": null,
-        "balloonAllowed": true,
-        "plan5050Allowed": true,
-        "defaultPhysicalStatement": false
-      },
-      "rates": [
-        {
-          "label": "Crédito vehicular tradicional",
-          "currency": "PEN",
-          "rateType": "TEA",
-          "minPercent": 7.99,
-          "maxPercent": null,
-          "calculationBaseDays": 360
-        },
-        {
-          "label": "Plan 50|50 - campaña",
-          "currency": "PEN",
-          "rateType": "TEA",
-          "minPercent": 0.0,
-          "maxPercent": 13.49,
-          "tceaMinReferencePercent": 12.50,
-          "calculationBaseDays": 360
-        }
-      ],
-      "insurances": [
-        {
-          "type": "DEGRAVAMEN",
-          "label": "Seguro de desgravamen individual",
-          "required": true,
-          "ratePercentMonthly": 0.127,
-          "displayValue": "0.127% mensual ref. Plan 50|50",
-          "base": "SALDO_INSOLUTO"
-        },
-        {
-          "type": "VEHICULAR",
-          "label": "Seguro vehicular",
-          "required": true,
-          "ratePercentAnnual": 5.26,
-          "displayValue": "5.26% anual ref.",
-          "base": "VALOR_VEHICULO"
-        }
-      ],
-      "charges": [
-        {
-          "type": "PORTES",
-          "label": "Portes",
-          "applies": false,
-          "amount": 0,
-          "currency": "PEN",
-          "frequency": "MONTHLY",
-          "displayValue": "No usar como 'portes'"
-        },
-        {
-          "type": "PHYSICAL_STATEMENT_DELIVERY",
-          "label": "Envío físico de estado de cuenta",
-          "applies": "OPTIONAL_OR_EXAMPLE",
-          "amount": 10.38,
-          "currency": "PEN",
-          "amountAlt": 2.5,
-          "currencyAlt": "USD",
-          "frequency": "MONTHLY",
-          "displayValue": "S/ 10.38 o US$ 2.50 según ejemplo Plan 50|50"
-        }
-      ],
-      "verification": {
-        "status": "PARTIALLY_VERIFIED",
-        "confidence": "MEDIUM",
-        "sourceName": "Santander Consumer Perú - Autos y Plan 50|50 Cuantitativo",
-        "sourceUrls": [
-          "https://www.santanderconsumer.com.pe/autos",
-          "https://www.santanderconsumer.com.pe/wp-content/uploads/2025/03/Plan-50-50-Cuantitativo.pdf"
-        ],
-        "observation": "Parte de los valores proviene de un ejemplo/campaña, no de una matriz tarifaria completa."
-      }
-    },
-    {
-      "code": "GNB",
-      "displayOrder": 6,
-      "name": "Banco GNB Perú",
-      "shortName": "Banco GNB",
-      "type": "Banco",
-      "logoText": "GNB",
-      "currency": "PEN",
-      "creditType": "VEHICULAR_AUTO_NUEVO",
-      "productName": "Crédito Vehicular Banco GNB",
-      "isVisible": true,
-      "canUseInSimulation": true,
-      "summary": {
-        "teaPublishedLabel": "10.50% - 14.90%",
-        "minimumInitialLabel": "Según evaluación",
-        "maximumFinancingLabel": "Según evaluación",
-        "termLabel": "Según evaluación",
-        "graceLabel": "No publicado",
-        "insuranceSummaryLabel": "Desgravamen / Vehicular",
-        "chargesSummaryLabel": "Póliza endosada / modificación"
-      },
-      "conditions": {
-        "minimumDownPaymentPercent": null,
-        "maximumFinancingPercent": null,
-        "minTermMonths": null,
-        "maxTermMonths": null,
-        "allowedTermMonths": null,
-        "maxGraceMonths": null,
-        "maxGraceDays": null,
-        "balloonAllowed": false,
-        "defaultPhysicalStatement": false
-      },
-      "rates": [
-        {
-          "label": "Auto nuevo",
-          "currency": "PEN",
-          "rateType": "TEA",
-          "minPercent": 10.50,
-          "maxPercent": 14.90,
-          "calculationBaseDays": 360
-        }
-      ],
-      "insurances": [
-        {
-          "type": "DEGRAVAMEN",
-          "label": "Seguro de desgravamen individual",
-          "required": true,
-          "ratePercentMonthly": 0.040,
-          "displayValue": "0.040% mensual",
-          "base": "SALDO_DEUDOR"
-        },
-        {
-          "type": "DEGRAVAMEN_CONYUGAL",
-          "label": "Seguro de desgravamen conyugal",
-          "required": false,
-          "ratePercentMonthly": 0.075,
-          "displayValue": "0.075% mensual",
-          "base": "SALDO_DEUDOR"
-        },
-        {
-          "type": "VEHICULAR",
-          "label": "Seguro vehicular",
-          "required": true,
-          "ratePercentAnnualMin": 1.98,
-          "ratePercentAnnualMax": 7.50,
-          "displayValue": "1.98% - 7.50% anual aprox. según categoría",
-          "base": "VALOR_VEHICULO"
-        }
-      ],
-      "charges": [
-        {
-          "type": "PORTES",
-          "label": "Portes",
-          "applies": false,
-          "amount": 0,
-          "currency": "PEN",
-          "frequency": "MONTHLY",
-          "displayValue": "No encontrado como concepto en tarifario revisado"
-        },
-        {
-          "type": "POLICY_ENDORSEMENT_EVALUATION",
-          "label": "Evaluación de endoso de póliza vehicular",
-          "applies": "OPTIONAL",
-          "amount": 300.0,
-          "currency": "PEN",
-          "frequency": "ANNUAL",
-          "displayValue": "S/ 300.00 anual"
-        },
-        {
-          "type": "CONDITIONS_MODIFICATION",
-          "label": "Modificación de condiciones",
-          "applies": "OPTIONAL",
-          "amount": 150.0,
-          "currency": "PEN",
-          "frequency": "EVENT",
-          "displayValue": "S/ 150.00"
-        }
-      ],
-      "verification": {
-        "status": "VERIFIED",
-        "confidence": "HIGH",
-        "sourceName": "Banco GNB - Tarifario Crédito Vehicular",
-        "sourceUrls": [
-          "https://www.bancognb.com.pe/main/download?file=peru%2Fbanca_personas%2Ftarifario-credito-vehicular.pdf"
-        ],
-        "observation": "Tarifario con vigencia desde 08.09.2025."
-      }
-    },
-    {
-      "code": "BANBIF",
-      "displayOrder": 7,
-      "name": "BanBif",
-      "shortName": "BanBif",
-      "type": "Banco",
-      "logoText": "BBF",
-      "currency": "PEN",
-      "creditType": "VEHICULAR",
-      "productName": "Préstamo Vehicular BanBif",
-      "isVisible": true,
-      "canUseInSimulation": false,
-      "summary": {
-        "teaPublishedLabel": "No verificado",
-        "minimumInitialLabel": "No verificado",
-        "maximumFinancingLabel": "No verificado",
-        "termLabel": "No verificado",
-        "graceLabel": "No verificado",
-        "insuranceSummaryLabel": "Endoso permitido / no verificado",
-        "chargesSummaryLabel": "Pendiente de fuente oficial"
-      },
-      "conditions": {
-        "minimumDownPaymentPercent": null,
-        "maximumFinancingPercent": null,
-        "minTermMonths": null,
-        "maxTermMonths": null,
-        "allowedTermMonths": null,
-        "maxGraceMonths": null,
-        "maxGraceDays": null,
-        "balloonAllowed": null,
-        "defaultPhysicalStatement": false
-      },
-      "rates": [],
-      "insurances": [],
-      "charges": [],
-      "verification": {
-        "status": "NOT_VERIFIED",
-        "confidence": "LOW",
-        "sourceName": "Pendiente de tarifario oficial recuperable",
-        "sourceUrls": [],
-        "observation": "No recomiendo usar los valores de pantalla para cálculos hasta validar un tarifario/hoja resumen oficial actual."
       }
     }
   ]

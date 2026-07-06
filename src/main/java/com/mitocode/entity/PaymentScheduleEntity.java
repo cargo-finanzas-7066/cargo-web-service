@@ -3,6 +3,7 @@ package com.mitocode.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 @Data
 @Entity
@@ -14,13 +15,18 @@ public class PaymentScheduleEntity {
     private Integer simulationId;
     private Integer period;
     private LocalDate date;
-    private Double initialBalance;
-    private Double payment;
-    private Double balloonPayment = 0.0;
-    private Double interest;
-    private Double amortization;
-    private Double insurance;
-    private Double commission;
-    private Double totalPayment;
-    private Double finalBalance;
+    private BigDecimal initialBalance;
+    private BigDecimal payment;
+    private BigDecimal balloonPayment = BigDecimal.ZERO;
+    private BigDecimal interest;
+    private BigDecimal amortization;
+    private BigDecimal insurance;
+    private BigDecimal creditLifeInsurance;
+    private BigDecimal vehicleInsurance;
+    private BigDecimal commission;
+    private BigDecimal totalPayment;
+    private BigDecimal finalFlow;
+    private BigDecimal baseFlow;
+    private BigDecimal finalBalance;
+    @Column(name="grace_type") private String graceType;
 }

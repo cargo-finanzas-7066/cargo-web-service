@@ -1,0 +1,30 @@
+ALTER TABLE clients ALTER COLUMN monthly_income TYPE NUMERIC(19,2) USING monthly_income::numeric(19,2);
+ALTER TABLE vehicles ALTER COLUMN price TYPE NUMERIC(19,2) USING price::numeric(19,2);
+
+ALTER TABLE simulations ALTER COLUMN vehicle_price TYPE NUMERIC(19,2) USING vehicle_price::numeric(19,2);
+ALTER TABLE simulations ALTER COLUMN down_payment TYPE NUMERIC(19,2) USING down_payment::numeric(19,2);
+ALTER TABLE simulations ALTER COLUMN down_payment_percent TYPE NUMERIC(7,4) USING down_payment_percent::numeric(7,4);
+ALTER TABLE simulations ALTER COLUMN financed_amount TYPE NUMERIC(19,2) USING financed_amount::numeric(19,2);
+ALTER TABLE simulations ALTER COLUMN tea TYPE NUMERIC(12,7) USING tea::numeric(12,7);
+ALTER TABLE simulations ALTER COLUMN tem TYPE NUMERIC(12,7) USING tem::numeric(12,7);
+ALTER TABLE simulations ALTER COLUMN balloon_amount TYPE NUMERIC(19,2) USING balloon_amount::numeric(19,2);
+ALTER TABLE simulations ALTER COLUMN insurance_disbursement TYPE NUMERIC(12,7) USING insurance_disbursement::numeric(12,7);
+ALTER TABLE simulations ALTER COLUMN insurance_vehicle TYPE NUMERIC(12,7) USING insurance_vehicle::numeric(12,7);
+ALTER TABLE simulations ALTER COLUMN monthly_fee TYPE NUMERIC(19,2) USING monthly_fee::numeric(19,2);
+ALTER TABLE simulations ALTER COLUMN admin_cost TYPE NUMERIC(19,2) USING admin_cost::numeric(19,2);
+ALTER TABLE simulations ALTER COLUMN notary_cost TYPE NUMERIC(19,2) USING notary_cost::numeric(19,2);
+ALTER TABLE simulations ALTER COLUMN other_charges TYPE NUMERIC(19,2) USING other_charges::numeric(19,2);
+ALTER TABLE simulations ALTER COLUMN monthly_payment TYPE NUMERIC(19,2) USING monthly_payment::numeric(19,2);
+ALTER TABLE simulations ALTER COLUMN van TYPE NUMERIC(19,2) USING van::numeric(19,2);
+ALTER TABLE simulations ALTER COLUMN tir TYPE NUMERIC(12,7) USING tir::numeric(12,7);
+ALTER TABLE simulations ALTER COLUMN tcea TYPE NUMERIC(12,7) USING tcea::numeric(12,7);
+
+ALTER TABLE payment_schedules ALTER COLUMN initial_balance TYPE NUMERIC(19,2) USING initial_balance::numeric(19,2);
+ALTER TABLE payment_schedules ALTER COLUMN payment TYPE NUMERIC(19,2) USING payment::numeric(19,2);
+ALTER TABLE payment_schedules ALTER COLUMN balloon_payment TYPE NUMERIC(19,2) USING balloon_payment::numeric(19,2);
+ALTER TABLE payment_schedules ALTER COLUMN interest TYPE NUMERIC(19,2) USING interest::numeric(19,2);
+ALTER TABLE payment_schedules ALTER COLUMN amortization TYPE NUMERIC(19,2) USING amortization::numeric(19,2);
+ALTER TABLE payment_schedules ALTER COLUMN insurance TYPE NUMERIC(19,2) USING insurance::numeric(19,2);
+ALTER TABLE payment_schedules ALTER COLUMN commission TYPE NUMERIC(19,2) USING commission::numeric(19,2);
+ALTER TABLE payment_schedules ALTER COLUMN total_payment TYPE NUMERIC(19,2) USING total_payment::numeric(19,2);
+ALTER TABLE payment_schedules ALTER COLUMN final_balance TYPE NUMERIC(19,2) USING final_balance::numeric(19,2);
