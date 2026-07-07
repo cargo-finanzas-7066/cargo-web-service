@@ -21,6 +21,10 @@ public class SimulationController {
     public ResponseEntity<SimulationResource> save(@Valid @RequestBody SimulationRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.save(request));
     }
+    @PutMapping("/simulations/{id}")
+    public SimulationResource update(@PathVariable Integer id, @Valid @RequestBody SimulationRequest request) {
+        return service.update(id, request);
+    }
     @GetMapping("/simulations")
     public Page<SimulationResource> findAll(@RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size,
             @RequestParam(required=false) SimulationSortField sortBy, @RequestParam(defaultValue="ASC") Sort.Direction direction) {

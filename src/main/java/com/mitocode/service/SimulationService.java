@@ -85,6 +85,41 @@ public class SimulationService {
         return toResource(entity, result.getSchedule());
     }
 
+    @Transactional
+    public SimulationResource update(Integer id, SimulationRequest request) {
+        UserEntity user = currentUserService.requireUser();
+        var entity = accessible(id, user);
+        requireClient(request.getClientId(), user);
+        VehicleEntity vehicle = vehicleRepository.findByIdAndActiveTrue(request.getVehicleId())
+                .orElseThrow(() -> new ResourceNotFoundException("VehÃ­culo no encontrado"));
+        FinancialProductEntity product = requireProduct(request.getFinancialProductId());
+        var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
+                request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
+                request.getFirstPaymentDate(), request.getPaymentDay(), product);
+        SimulationResult result = engine.calculate(input);
+
+        entity.setClientId(request.getClientId()); entity.setVehicleId(request.getVehicleId());
+        entity.setEntityId(product.getFinancialInstitution().getId()); entity.setFinancialProduct(product);
+        entity.setProductSnapshot(snapshot(product)); entity.setCurrency(product.getCurrency()); entity.setVehiclePrice(input.vehiclePrice());
+        entity.setDownPaymentPercent(input.downPaymentPercent());
+        entity.setDownPayment(input.vehiclePrice().multiply(input.downPaymentPercent()).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
+        entity.setFinancedAmount(result.getFinancedAmount()); entity.setTerm(input.termMonths()); entity.setFirstPaymentDate(input.firstPaymentDate());
+        entity.setDisbursementDate(input.firstPaymentDate().minusMonths(1)); entity.setPaymentDay(input.paymentDay());
+        entity.setGraceType(input.graceType().name()); entity.setGraceMonths(input.graceMonths());
+        entity.setBalloonEnabled(input.balloonPercent().signum() > 0); entity.setBalloonPercent(input.balloonPercent()); entity.setBalloonAmount(result.getBalloonAmount());
+        entity.setTea(result.getTea()); entity.setTem(result.getTem()); entity.setCokTea(result.getCokTeaPercent()); entity.setCokTem(result.getCokTemPercent()); entity.setMonthlyPayment(result.getMonthlyPayment());
+        entity.setVan(result.getVan()); entity.setTir(result.getTir()); entity.setTcea(result.getTcea());
+        entity.setTotalInterest(result.getTotalInterest()); entity.setTotalInsurance(result.getTotalInsurance());
+        entity.setTotalFees(result.getTotalCommissions()); entity.setTotalPayment(result.getTotalPayment()); entity.setStatus("Guardado");
+        entity = simulationRepository.save(entity);
+
+        scheduleRepository.deleteBySimulationId(entity.getId());
+        Integer simulationId = entity.getId();
+        var periods = result.getSchedule().stream().map(row -> period(simulationId, row)).toList();
+        scheduleRepository.saveAll(periods);
+        return toResource(entity, result.getSchedule());
+    }
+
     @Transactional(readOnly = true)
     public Page<SimulationResource> findAll(Pageable pageable) {
         UserEntity user = currentUserService.requireUser();
