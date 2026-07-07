@@ -17,7 +17,7 @@ import java.util.Set;
 @Order(10)
 @RequiredArgsConstructor
 public class FinancialInstitutionSeedService implements CommandLineRunner {
-    private static final Set<String> ENABLED_CODES = Set.of("BCP", "BBVA", "INTERBANK", "SCOTIABANK");
+    private static final Set<String> ENABLED_CODES = Set.of("BCP", "BBVA", "INTERBANK");
     private final FinancialInstitutionRepository financialInstitutionRepository;
     private final ObjectMapper objectMapper;
 
@@ -123,18 +123,6 @@ public class FinancialInstitutionSeedService implements CommandLineRunner {
             entity.setMinTerm(12);
             entity.setMaxTerm(60);
             entity.setTea(14.49);
-            entity.setCanUseInSimulation(true);
-            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
-        }
-        if ("SCOTIABANK".equals(entity.getCode())) {
-            entity.setTeaPublishedLabel("8.99% - 22.99%");
-            entity.setMinimumInitialLabel("Desde 0%");
-            entity.setMaximumFinancingLabel("Hasta 100%");
-            entity.setMinDownPayment(0.0);
-            entity.setMaxFinancing(100.0);
-            entity.setMinTerm(12);
-            entity.setMaxTerm(72);
-            entity.setTea(12.50);
             entity.setCanUseInSimulation(true);
             entity.setVerificationStatus("VERIFIED_FROM_DATASET");
         }

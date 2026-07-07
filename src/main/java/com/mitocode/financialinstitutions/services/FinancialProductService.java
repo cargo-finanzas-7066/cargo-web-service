@@ -10,15 +10,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Set;
 
 @Service @RequiredArgsConstructor
 public class FinancialProductService {
+    private static final Set<String> ENABLED_INSTITUTION_CODES = Set.of("BCP", "BBVA", "INTERBANK");
     private final FinancialProductRepository repository;
     private final FinancialInstitutionRepository institutionRepository;
 
     @Transactional(readOnly = true)
     public Page<FinancialProductResource> findAll(String institution, Pageable pageable) {
-        return repository.findByActiveTrueAndFinancialInstitution_NameContainingIgnoreCase(institution, pageable).map(this::toResource);
+        return repository.findByActiveTrueAndFinancialInstitution_CodeInAndFinancialInstitution_NameContainingIgnoreCase(ENABLED_INSTITUTION_CODES, institution, pageable).map(this::toResource);
     }
     @Transactional(readOnly = true)
     public FinancialProductResource findById(Integer id) { return toResource(requireActive(id)); }
@@ -53,7 +55,9 @@ public class FinancialProductService {
     }
 
     public FinancialProductEntity requireActive(Integer id) {
-        return repository.findByIdAndActiveTrue(id).orElseThrow(() -> new ResourceNotFoundException("Producto financiero no encontrado"));
+        var product = repository.findByIdAndActiveTrue(id).orElseThrow(() -> new ResourceNotFoundException("Producto financiero no encontrado"));
+        if (!ENABLED_INSTITUTION_CODES.contains(product.getFinancialInstitution().getCode())) throw new ResourceNotFoundException("Producto financiero no encontrado");
+        return product;
     }
 
     private void validate(FinancialProductResource v) {

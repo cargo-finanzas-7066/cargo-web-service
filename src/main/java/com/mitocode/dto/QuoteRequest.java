@@ -22,4 +22,8 @@ public class QuoteRequest {
     @NotNull private GraceType graceType = GraceType.NONE;
     @NotNull @Min(0) private Integer graceMonths = 0;
     @NotNull @DecimalMin("0.0") @DecimalMax("99.9999") private BigDecimal balloonPercent = BigDecimal.ZERO;
+    @NotNull private Boolean creditLifeInsuranceEnabled = true;
+    @DecimalMin("0.0") private BigDecimal creditLifeInsuranceMonthlyPercent;
+    @NotNull private Boolean vehicleInsuranceEnabled = true;
+    @DecimalMin("0.0") private BigDecimal vehicleInsuranceAnnualPercent;
 }

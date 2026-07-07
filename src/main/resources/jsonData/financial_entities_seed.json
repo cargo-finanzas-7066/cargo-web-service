@@ -318,9 +318,9 @@
           "type": "VEHICULAR",
           "label": "Seguro vehicular",
           "required": true,
-          "ratePercentAnnualMin": 3.40,
+          "ratePercentAnnualMin": 3.52,
           "ratePercentAnnualMax": 6.73,
-          "displayValue": "3.40% - 6.73% anual según categoría y zona",
+          "displayValue": "3.52% - 6.73% anual según categoría y zona",
           "base": "VALOR_VEHICULO"
         }
       ],

@@ -20,7 +20,8 @@ public class FinancialEngine {
 
     public record Input(BigDecimal vehiclePrice, BigDecimal teaPercent, BigDecimal downPaymentPercent, BigDecimal balloonPercent,
                         BigDecimal cokTeaPercent, int termMonths, GraceType graceType, int graceMonths,
-                        LocalDate firstPaymentDate, int paymentDay, FinancialProductEntity product) {}
+                        LocalDate firstPaymentDate, int paymentDay, BigDecimal creditLifeInsuranceMonthlyPercent,
+                        BigDecimal vehicleInsuranceAnnualPercent, FinancialProductEntity product) {}
 
     public SimulationResult calculate(Input input) {
         validate(input);
@@ -30,10 +31,10 @@ public class FinancialEngine {
         BigDecimal cokTea = input.cokTeaPercent();
         BigDecimal cokMonthlyRate = effectiveMonthlyRate(cokTea);
         BigDecimal principal = input.vehiclePrice().multiply(BigDecimal.ONE.subtract(input.downPaymentPercent().divide(HUNDRED, MC)), MC);
-        BigDecimal balloon = principal.multiply(input.balloonPercent().divide(HUNDRED, MC), MC);
-        BigDecimal lifeRate = product.getCreditLifeInsuranceMonthlyPercent().divide(HUNDRED, MC);
+        BigDecimal balloon = input.vehiclePrice().multiply(input.balloonPercent().divide(HUNDRED, MC), MC);
+        BigDecimal lifeRate = input.creditLifeInsuranceMonthlyPercent().divide(HUNDRED, MC);
         // La seed expresa el seguro vehicular como tasa anual; el cronograma es mensual.
-        BigDecimal vehicleInsuranceMonthlyPercent = product.getVehicleInsuranceAnnualPercent()
+        BigDecimal vehicleInsuranceMonthlyPercent = input.vehicleInsuranceAnnualPercent()
                 .divide(TWELVE, 4, RoundingMode.HALF_UP);
         BigDecimal vehicleInsurance = input.vehiclePrice()
                 .multiply(vehicleInsuranceMonthlyPercent.divide(HUNDRED, MC), MC);
@@ -121,7 +122,7 @@ public class FinancialEngine {
         }
 
         if (balance.abs().compareTo(CENT) > 0) throw new UnprocessableEntityException("El saldo final no es cero: " + money(balance));
-        BigDecimal monthlyIrr = irr(cashflows);
+        BigDecimal monthlyIrr = irr(baseCashflows);
         BigDecimal annualIrr = BigDecimal.ONE.add(monthlyIrr).pow(12, MC).subtract(BigDecimal.ONE);
         BigDecimal totalInterest = totalInterestAccrued;
         BigDecimal totalInsurance = totalInsuranceAccrued;
@@ -145,6 +146,8 @@ public class FinancialEngine {
         if (i.vehiclePrice() == null || i.vehiclePrice().signum() <= 0) throw new IllegalArgumentException("El precio debe ser mayor a cero");
         if (i.product() == null) throw new IllegalArgumentException("El producto financiero es obligatorio");
         if (i.downPaymentPercent() == null || i.balloonPercent() == null) throw new IllegalArgumentException("Los porcentajes son obligatorios");
+        if (i.creditLifeInsuranceMonthlyPercent() == null || i.vehicleInsuranceAnnualPercent() == null) throw new IllegalArgumentException("Los seguros son obligatorios");
+        if (i.creditLifeInsuranceMonthlyPercent().signum() < 0 || i.vehicleInsuranceAnnualPercent().signum() < 0) throw new IllegalArgumentException("Los seguros no pueden ser negativos");
         if (i.teaPercent() != null && i.teaPercent().signum() < 0) throw new IllegalArgumentException("La TEA no puede ser negativa");
         if (i.cokTeaPercent() == null) throw new IllegalArgumentException("El COK es obligatorio");
         if (i.cokTeaPercent().signum() < 0) throw new IllegalArgumentException("El COK no puede ser negativo");

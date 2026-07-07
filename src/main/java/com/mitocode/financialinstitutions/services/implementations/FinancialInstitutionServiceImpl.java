@@ -9,15 +9,18 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class FinancialInstitutionServiceImpl implements FinancialInstitutionService {
+    private static final Set<String> ENABLED_INSTITUTION_CODES = Set.of("BCP", "BBVA", "INTERBANK");
     private final FinancialInstitutionRepository financialInstitutionRepository;
 
     @Override
     public List<FinancialInstitutionResource> findAll() {
         return financialInstitutionRepository.findByStatusAndCodeIsNotNullOrderByDisplayOrderAsc("Activo").stream()
+                .filter(entity -> ENABLED_INSTITUTION_CODES.contains(entity.getCode()))
                 .map(this::toResource)
                 .toList();
     }
@@ -25,6 +28,7 @@ public class FinancialInstitutionServiceImpl implements FinancialInstitutionServ
     @Override
     public FinancialInstitutionResource findById(Integer id) {
         return financialInstitutionRepository.findById(id)
+                .filter(entity -> ENABLED_INSTITUTION_CODES.contains(entity.getCode()))
                 .map(this::toResource)
                 .orElseThrow(() -> new IllegalArgumentException("Entidad financiera no encontrada"));
     }

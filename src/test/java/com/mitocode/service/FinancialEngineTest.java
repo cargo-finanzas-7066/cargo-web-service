@@ -41,7 +41,7 @@ class FinancialEngineTest {
         var result=engine.calculate(input(p,"28500","25","35",36,GraceType.TOTAL,6));
         assertThat(result.getSchedule()).hasSize(36);
         assertThat(result.getSchedule().get(35).getFinalBalance()).isEqualByComparingTo("0.00");
-        assertThat(result.getSchedule().get(35).getBalloonPayment()).isEqualByComparingTo("7481.25");
+        assertThat(result.getSchedule().get(35).getBalloonPayment()).isEqualByComparingTo("9975.00");
         assertThat(result.getSchedule().subList(0,6)).allMatch(row -> row.getGraceType().equals("TOTAL"));
         assertThat(result.getTotalInsurance()).isEqualByComparingTo("384.75");
     }
@@ -76,12 +76,12 @@ class FinancialEngineTest {
         var result=engine.calculate(input(p,"106915.50","20","50","13",33,GraceType.PARTIAL,3));
 
         assertThat(result.getFinancedAmount()).isEqualByComparingTo("85532.40");
-        assertThat(result.getBalloonAmount()).isEqualByComparingTo("42766.20");
-        assertThat(result.getMonthlyPayment()).isEqualByComparingTo("2129.38");
+        assertThat(result.getBalloonAmount()).isEqualByComparingTo("53457.75");
+        assertThat(result.getMonthlyPayment()).isEqualByComparingTo("1821.39");
         assertThat(result.getCokTemPercent()).isEqualByComparingTo("1.0236844");
-        assertThat(result.getVan()).isEqualByComparingTo("-636.43");
-        assertThat(result.getTir()).isEqualByComparingTo("1.6439375");
-        assertThat(result.getTcea()).isEqualByComparingTo("21.6123745");
+        assertThat(result.getVan()).isEqualByComparingTo("-593.26");
+        assertThat(result.getTir()).isEqualByComparingTo("1.0527409");
+        assertThat(result.getTcea()).isEqualByComparingTo("13.3906307");
 
         var grace=result.getSchedule().get(0);
         assertThat(grace.getInterest()).isEqualByComparingTo("843.66");
@@ -92,9 +92,9 @@ class FinancialEngineTest {
 
         var firstRegular=result.getSchedule().get(3);
         assertThat(firstRegular.getInterest()).isEqualByComparingTo("857.36");
-        assertThat(firstRegular.getAmortization()).isEqualByComparingTo("1272.02");
-        assertThat(firstRegular.getPayment()).isEqualByComparingTo("2592.65");
-        assertThat(firstRegular.getBaseFlow()).isEqualByComparingTo("-2129.38");
+        assertThat(firstRegular.getAmortization()).isEqualByComparingTo("964.02");
+        assertThat(firstRegular.getPayment()).isEqualByComparingTo("2284.65");
+        assertThat(firstRegular.getBaseFlow()).isEqualByComparingTo("-1821.39");
         var last=result.getSchedule().get(32);
         assertThat(last.getAmortization()).isEqualByComparingTo(last.getInitialBalance());
         assertThat(last.getFinalBalance()).isEqualByComparingTo("0.00");
@@ -128,7 +128,7 @@ class FinancialEngineTest {
     private FinancialEngine.Input input(FinancialProductEntity p,String price,String down,String balloon,String cokTea,int term,GraceType grace,int graceMonths){
         return new FinancialEngine.Input(new BigDecimal(price),p.getTeaPercent(),new BigDecimal(down),new BigDecimal(balloon),
                 cokTea == null ? null : new BigDecimal(cokTea),term,grace,graceMonths,
-                LocalDate.of(2026,7,5),5,p);
+                LocalDate.of(2026,7,5),5,p.getCreditLifeInsuranceMonthlyPercent(),p.getVehicleInsuranceAnnualPercent(),p);
     }
     private FinancialProductEntity product(String tea){
         var institution=new FinancialInstitutionEntity();institution.setId(1);institution.setCode("TEST");institution.setName("Banco Test");

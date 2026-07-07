@@ -13,7 +13,7 @@ import java.util.Set;
 
 @Component @Profile("dev") @Order(20) @RequiredArgsConstructor
 public class FinancialProductSeedService implements CommandLineRunner {
-    private static final Set<String> ENABLED_CODES = Set.of("BCP", "BBVA", "INTERBANK", "SCOTIABANK");
+    private static final Set<String> ENABLED_CODES = Set.of("BCP", "BBVA", "INTERBANK");
     private final FinancialInstitutionRepository institutions;
     private final FinancialProductRepository products;
     @Override public void run(String... args) {

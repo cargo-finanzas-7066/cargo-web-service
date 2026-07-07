@@ -10,6 +10,7 @@ import java.util.Optional;
 
 public interface FinancialProductRepository extends JpaRepository<FinancialProductEntity, Integer> {
     Page<FinancialProductEntity> findByActiveTrueAndFinancialInstitution_NameContainingIgnoreCase(String institution, Pageable pageable);
+    Page<FinancialProductEntity> findByActiveTrueAndFinancialInstitution_CodeInAndFinancialInstitution_NameContainingIgnoreCase(Collection<String> codes, String institution, Pageable pageable);
     Optional<FinancialProductEntity> findByIdAndActiveTrue(Integer id);
     Optional<FinancialProductEntity> findFirstByFinancialInstitutionIdAndActiveTrueOrderByVersionDesc(Integer institutionId);
     List<FinancialProductEntity> findByIdInAndActiveTrue(Collection<Integer> ids);

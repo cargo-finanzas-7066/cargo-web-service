@@ -1,5 +1,7 @@
 package com.mitocode.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mitocode.customers.persistence.entities.CustomerEntity;
 import com.mitocode.customers.persistence.repositories.CustomerRepository;
 import com.mitocode.dto.*;
@@ -21,9 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.*;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.regex.Pattern;
 
 @Service @RequiredArgsConstructor
 public class SimulationService {
+    private static final Set<String> ENABLED_INSTITUTION_CODES = Set.of("BCP", "BBVA", "INTERBANK");
+    private static final Pattern RATE_NUMBER = Pattern.compile("\\d+(?:\\.\\d+)?");
     private final SimulationRepository simulationRepository;
     private final PaymentScheduleRepository scheduleRepository;
     private final CustomerRepository customerRepository;
@@ -31,6 +36,7 @@ public class SimulationService {
     private final FinancialProductRepository productRepository;
     private final CurrentUserService currentUserService;
     private final FinancialEngine engine;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public List<QuoteResource> quote(QuoteRequest request) {
@@ -40,9 +46,12 @@ public class SimulationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
         return request.getFinancialProductIds().stream().distinct().map(productId -> {
             FinancialProductEntity product = requireProduct(productId);
+            validateInsuranceRanges(Boolean.TRUE.equals(request.getCreditLifeInsuranceEnabled()) ? request.getCreditLifeInsuranceMonthlyPercent() : null,
+                    Boolean.TRUE.equals(request.getVehicleInsuranceEnabled()) ? request.getVehicleInsuranceAnnualPercent() : null, product);
             var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
                     null, request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
-                    request.getFirstPaymentDate(), request.getPaymentDay(), product);
+                    request.getFirstPaymentDate(), request.getPaymentDay(), request.getCreditLifeInsuranceEnabled(), request.getCreditLifeInsuranceMonthlyPercent(),
+                    request.getVehicleInsuranceEnabled(), request.getVehicleInsuranceAnnualPercent(), product);
             var result = engine.calculate(input);
             var institution = product.getFinancialInstitution();
             return new QuoteResource(product.getId(), institution.getCode(), institution.getName(), product.getProductName(), product.getVersion(), result);
@@ -57,9 +66,12 @@ public class SimulationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
         FinancialProductEntity product = requireProduct(request.getFinancialProductId());
         validateTeaRange(request.getTeaPercent(), product);
+        validateInsuranceRanges(Boolean.TRUE.equals(request.getCreditLifeInsuranceEnabled()) ? request.getCreditLifeInsuranceMonthlyPercent() : null,
+                Boolean.TRUE.equals(request.getVehicleInsuranceEnabled()) ? request.getVehicleInsuranceAnnualPercent() : null, product);
         var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
                 request.getTeaPercent(), request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
-                request.getFirstPaymentDate(), request.getPaymentDay(), product);
+                request.getFirstPaymentDate(), request.getPaymentDay(), request.getCreditLifeInsuranceEnabled(), request.getCreditLifeInsuranceMonthlyPercent(),
+                request.getVehicleInsuranceEnabled(), request.getVehicleInsuranceAnnualPercent(), product);
         SimulationResult result = engine.calculate(input);
 
         var entity = new SimulationEntity();
@@ -72,6 +84,7 @@ public class SimulationService {
         entity.setDisbursementDate(input.firstPaymentDate().minusMonths(1)); entity.setPaymentDay(input.paymentDay());
         entity.setGraceType(input.graceType().name()); entity.setGraceMonths(input.graceMonths());
         entity.setBalloonEnabled(input.balloonPercent().signum() > 0); entity.setBalloonPercent(input.balloonPercent()); entity.setBalloonAmount(result.getBalloonAmount());
+        entity.setInsuranceDisbursement(input.creditLifeInsuranceMonthlyPercent()); entity.setInsuranceVehicle(input.vehicleInsuranceAnnualPercent());
         entity.setTea(result.getTea()); entity.setTem(result.getTem()); entity.setCokTea(result.getCokTeaPercent()); entity.setCokTem(result.getCokTemPercent()); entity.setMonthlyPayment(result.getMonthlyPayment());
         entity.setVan(result.getVan()); entity.setTir(result.getTir()); entity.setTcea(result.getTcea());
         entity.setTotalInterest(result.getTotalInterest()); entity.setTotalInsurance(result.getTotalInsurance());
@@ -95,9 +108,12 @@ public class SimulationService {
                 .orElseThrow(() -> new ResourceNotFoundException("VehÃ­culo no encontrado"));
         FinancialProductEntity product = requireProduct(request.getFinancialProductId());
         validateTeaRange(request.getTeaPercent(), product);
+        validateInsuranceRanges(Boolean.TRUE.equals(request.getCreditLifeInsuranceEnabled()) ? request.getCreditLifeInsuranceMonthlyPercent() : null,
+                Boolean.TRUE.equals(request.getVehicleInsuranceEnabled()) ? request.getVehicleInsuranceAnnualPercent() : null, product);
         var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
                 request.getTeaPercent(), request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
-                request.getFirstPaymentDate(), request.getPaymentDay(), product);
+                request.getFirstPaymentDate(), request.getPaymentDay(), request.getCreditLifeInsuranceEnabled(), request.getCreditLifeInsuranceMonthlyPercent(),
+                request.getVehicleInsuranceEnabled(), request.getVehicleInsuranceAnnualPercent(), product);
         SimulationResult result = engine.calculate(input);
 
         entity.setClientId(request.getClientId()); entity.setVehicleId(request.getVehicleId());
@@ -109,6 +125,7 @@ public class SimulationService {
         entity.setDisbursementDate(input.firstPaymentDate().minusMonths(1)); entity.setPaymentDay(input.paymentDay());
         entity.setGraceType(input.graceType().name()); entity.setGraceMonths(input.graceMonths());
         entity.setBalloonEnabled(input.balloonPercent().signum() > 0); entity.setBalloonPercent(input.balloonPercent()); entity.setBalloonAmount(result.getBalloonAmount());
+        entity.setInsuranceDisbursement(input.creditLifeInsuranceMonthlyPercent()); entity.setInsuranceVehicle(input.vehicleInsuranceAnnualPercent());
         entity.setTea(result.getTea()); entity.setTem(result.getTem()); entity.setCokTea(result.getCokTeaPercent()); entity.setCokTem(result.getCokTemPercent()); entity.setMonthlyPayment(result.getMonthlyPayment());
         entity.setVan(result.getVan()); entity.setTir(result.getTir()); entity.setTcea(result.getTcea());
         entity.setTotalInterest(result.getTotalInterest()); entity.setTotalInsurance(result.getTotalInsurance());
@@ -156,31 +173,141 @@ public class SimulationService {
     }
     private FinancialProductEntity requireProduct(Integer id) {
         var p = productRepository.findByIdAndActiveTrue(id).orElseThrow(() -> new ResourceNotFoundException("Producto financiero no encontrado"));
+        String code = p.getFinancialInstitution() == null ? null : p.getFinancialInstitution().getCode();
+        if (!ENABLED_INSTITUTION_CODES.contains(code)) throw new UnprocessableEntityException("La entidad financiera no está habilitada para simulación");
         LocalDate today = LocalDate.now();
         if (p.getValidFrom().isAfter(today) || (p.getValidUntil()!=null && p.getValidUntil().isBefore(today))) throw new UnprocessableEntityException("El producto financiero no está vigente");
         return p;
     }
     private FinancialEngine.Input input(BigDecimal requestedPrice, VehicleEntity vehicle, BigDecimal down, BigDecimal balloon, BigDecimal tea, BigDecimal cokTea,
-                                        int term, GraceType grace, int graceMonths, LocalDate first, int paymentDay, FinancialProductEntity product) {
+                                        int term, GraceType grace, int graceMonths, LocalDate first, int paymentDay,
+                                        Boolean creditLifeEnabled, BigDecimal creditLifePercent,
+                                        Boolean vehicleInsuranceEnabled, BigDecimal vehicleInsurancePercent,
+                                        FinancialProductEntity product) {
         BigDecimal price = requestedPrice == null ? vehicle.getPrice() : requestedPrice;
         if (!product.getCurrency().equalsIgnoreCase(vehicle.getCurrency())) throw new UnprocessableEntityException("La moneda del vehículo no coincide con el producto");
-        return new FinancialEngine.Input(price, tea == null ? product.getTeaPercent() : tea, down, balloon, cokTea, term, grace, graceMonths, first, paymentDay, product);
+        BigDecimal lifeRate = Boolean.TRUE.equals(creditLifeEnabled) ? (creditLifePercent == null ? defaultInsurancePercent(product, true) : creditLifePercent) : BigDecimal.ZERO;
+        BigDecimal vehicleRate = Boolean.TRUE.equals(vehicleInsuranceEnabled) ? (vehicleInsurancePercent == null ? defaultInsurancePercent(product, false) : vehicleInsurancePercent) : BigDecimal.ZERO;
+        return new FinancialEngine.Input(price, tea == null ? product.getTeaPercent() : tea, down, balloon, cokTea, term, grace, graceMonths, first, paymentDay, lifeRate, vehicleRate, product);
     }
     private void validateTeaRange(BigDecimal tea, FinancialProductEntity product) {
         if (tea == null) return;
         String code = product.getFinancialInstitution().getCode();
-        BigDecimal min;
-        BigDecimal max;
-        switch (code) {
-            case "BCP" -> { min = new BigDecimal("8.00"); max = new BigDecimal("20.26"); }
-            case "BBVA" -> { min = new BigDecimal("1.99"); max = new BigDecimal("24.99"); }
-            case "INTERBANK" -> { min = new BigDecimal("0.00"); max = new BigDecimal("16.39"); }
-            case "SCOTIABANK" -> { min = new BigDecimal("8.99"); max = new BigDecimal("22.99"); }
-            default -> throw new UnprocessableEntityException("La entidad financiera no está habilitada para simulación");
-        }
+        if (!ENABLED_INSTITUTION_CODES.contains(code)) throw new UnprocessableEntityException("La entidad financiera no está habilitada para simulación");
+        var range = teaRange(product);
+        BigDecimal min = range[0];
+        BigDecimal max = range[1];
         if (tea.compareTo(min) < 0 || tea.compareTo(max) > 0) {
             throw new UnprocessableEntityException("La TEA debe estar entre " + min + "% y " + max + "% para " + code);
         }
+    }
+    private void validateInsuranceRanges(BigDecimal creditLifeMonthlyPercent, BigDecimal vehicleAnnualPercent, FinancialProductEntity product) {
+        if (creditLifeMonthlyPercent != null) {
+            var range = insuranceRange(product, "DEGRAVAMEN", true);
+            if (creditLifeMonthlyPercent.signum() < 0 || creditLifeMonthlyPercent.compareTo(range[0]) < 0 || creditLifeMonthlyPercent.compareTo(range[1]) > 0) {
+                throw new UnprocessableEntityException("El seguro de desgravamen debe estar entre " + range[0] + "% y " + range[1] + "% mensual para " + product.getFinancialInstitution().getCode());
+            }
+        }
+        if (vehicleAnnualPercent != null) {
+            var range = insuranceRange(product, "VEHICULAR", false);
+            if (vehicleAnnualPercent.signum() < 0 || vehicleAnnualPercent.compareTo(range[0]) < 0 || vehicleAnnualPercent.compareTo(range[1]) > 0) {
+                throw new UnprocessableEntityException("El seguro vehicular debe estar entre " + range[0] + "% y " + range[1] + "% anual para " + product.getFinancialInstitution().getCode());
+            }
+        }
+    }
+    private BigDecimal[] insuranceRange(FinancialProductEntity product, String type, boolean monthly) {
+        BigDecimal min = null;
+        BigDecimal max = null;
+        String insurancesJson = product.getFinancialInstitution().getInsurancesJson();
+        try {
+            JsonNode insurances = objectMapper.readTree(insurancesJson == null || insurancesJson.isBlank() ? "[]" : insurancesJson);
+            for (JsonNode insurance : insurances) {
+                if (!insurance.path("type").asText("").contains(type)) continue;
+                BigDecimal fixed = decimal(insurance.path(monthly ? "ratePercentMonthly" : "ratePercentAnnual"));
+                BigDecimal rateMin = decimal(insurance.path(monthly ? "ratePercentMonthlyMin" : "ratePercentAnnualMin"));
+                BigDecimal rateMax = decimal(insurance.path(monthly ? "ratePercentMonthlyMax" : "ratePercentAnnualMax"));
+                if (fixed != null) {
+                    rateMin = fixed;
+                    rateMax = fixed;
+                }
+                if (!monthly && fixed == null) {
+                    BigDecimal monthlyFixed = decimal(insurance.path("ratePercentMonthly"));
+                    if (monthlyFixed != null) {
+                        rateMin = monthlyFixed.multiply(new BigDecimal("12"));
+                        rateMax = rateMin;
+                    }
+                }
+                min = min(min, rateMin);
+                max = max(max, rateMax);
+            }
+        } catch (Exception ignored) {
+            min = null;
+            max = null;
+        }
+        Double institutionFallbackValue = monthly ? product.getFinancialInstitution().getInsuranceDisbursement() : product.getFinancialInstitution().getInsuranceVehicle();
+        BigDecimal institutionFallback = institutionFallbackValue == null ? null : BigDecimal.valueOf(institutionFallbackValue);
+        BigDecimal productFallback = monthly ? product.getCreditLifeInsuranceMonthlyPercent() : product.getVehicleInsuranceAnnualPercent();
+        BigDecimal fallback = productFallback != null && productFallback.signum() > 0 ? productFallback : institutionFallback;
+        min = min(min, fallback);
+        max = max(max, fallback);
+        return new BigDecimal[]{min, max};
+    }
+    private BigDecimal defaultInsurancePercent(FinancialProductEntity product, boolean monthly) {
+        BigDecimal productValue = monthly ? product.getCreditLifeInsuranceMonthlyPercent() : product.getVehicleInsuranceAnnualPercent();
+        if (productValue != null && productValue.signum() > 0) return productValue;
+        Double institutionValue = monthly ? product.getFinancialInstitution().getInsuranceDisbursement() : product.getFinancialInstitution().getInsuranceVehicle();
+        return institutionValue == null ? BigDecimal.ZERO : BigDecimal.valueOf(institutionValue);
+    }
+    private BigDecimal[] teaRange(FinancialProductEntity product) {
+        var labelRange = parseRangeLabel(product.getFinancialInstitution().getTeaPublishedLabel());
+        if (labelRange != null) return labelRange;
+
+        BigDecimal min = null;
+        BigDecimal max = null;
+        String ratesJson = product.getFinancialInstitution().getRatesJson();
+        try {
+            JsonNode rates = objectMapper.readTree(ratesJson == null || ratesJson.isBlank() ? "[]" : ratesJson);
+            for (JsonNode rate : rates) {
+                if (!"TEA".equalsIgnoreCase(rate.path("rateType").asText("TEA"))) continue;
+                String currency = rate.path("currency").asText(product.getCurrency());
+                if (!product.getCurrency().equalsIgnoreCase(currency)) continue;
+                BigDecimal rateMin = decimal(rate.path("minPercent"));
+                BigDecimal rateMax = decimal(rate.path("maxPercent"));
+                BigDecimal fixed = decimal(rate.path("fixedPercent"));
+                if (fixed != null) {
+                    rateMin = fixed;
+                    rateMax = fixed;
+                }
+                min = min(min, rateMin);
+                max = max(max, rateMax);
+            }
+        } catch (Exception ignored) {
+            min = null;
+            max = null;
+        }
+        if (max == null) max = product.getTeaPercent();
+        if (min == null) min = BigDecimal.ZERO;
+        return new BigDecimal[]{min, max};
+    }
+    private BigDecimal[] parseRangeLabel(String label) {
+        if (label == null || label.isBlank()) return null;
+        var matcher = RATE_NUMBER.matcher(label.replace(",", "."));
+        List<BigDecimal> values = new ArrayList<>();
+        while (matcher.find()) values.add(new BigDecimal(matcher.group()));
+        if (values.isEmpty()) return null;
+        if (values.size() == 1) return new BigDecimal[]{BigDecimal.ZERO, values.get(0)};
+        return new BigDecimal[]{values.get(0), values.get(1)};
+    }
+    private BigDecimal decimal(JsonNode node) {
+        return node == null || node.isMissingNode() || node.isNull() ? null : node.decimalValue();
+    }
+    private BigDecimal min(BigDecimal current, BigDecimal value) {
+        if (value == null) return current;
+        return current == null || value.compareTo(current) < 0 ? value : current;
+    }
+    private BigDecimal max(BigDecimal current, BigDecimal value) {
+        if (value == null) return current;
+        return current == null || value.compareTo(current) > 0 ? value : current;
     }
     private Map<String,Object> snapshot(FinancialProductEntity p) {
         var i=p.getFinancialInstitution(); var map=new LinkedHashMap<String,Object>();
@@ -210,6 +337,8 @@ public class SimulationService {
         r.setFinancialProductId(e.getFinancialProduct()==null?null:e.getFinancialProduct().getId());r.setCurrency(e.getCurrency());r.setVehiclePrice(e.getVehiclePrice());
         r.setDownPaymentPercent(e.getDownPaymentPercent());r.setFinancedAmount(e.getFinancedAmount());r.setTermMonths(e.getTerm());r.setFirstPaymentDate(e.getFirstPaymentDate());
         r.setPaymentDay(e.getPaymentDay());r.setGraceType(e.getGraceType());r.setGraceMonths(e.getGraceMonths());r.setBalloonPercent(e.getBalloonPercent());
+        r.setCreditLifeInsuranceMonthlyPercent(e.getInsuranceDisbursement());r.setCreditLifeInsuranceEnabled(e.getInsuranceDisbursement()!=null&&e.getInsuranceDisbursement().signum()>0);
+        r.setVehicleInsuranceAnnualPercent(e.getInsuranceVehicle());r.setVehicleInsuranceEnabled(e.getInsuranceVehicle()!=null&&e.getInsuranceVehicle().signum()>0);
         r.setMonthlyPayment(e.getMonthlyPayment());r.setTeaPercent(e.getTea());r.setTemPercent(e.getTem());r.setCokTeaPercent(e.getCokTea());r.setCokTemPercent(e.getCokTem());r.setTirPercent(e.getTir());r.setTceaPercent(e.getTcea());r.setVan(e.getVan());
         r.setTotalInterest(e.getTotalInterest());r.setTotalInsurance(e.getTotalInsurance());r.setTotalFees(e.getTotalFees());r.setTotalPayment(e.getTotalPayment());
         r.setProductSnapshot(e.getProductSnapshot());r.setCreatedAt(e.getCreatedAtTimestamp());r.setSchedule(schedule);return r;

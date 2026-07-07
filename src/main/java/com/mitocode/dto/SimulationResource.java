@@ -23,6 +23,10 @@ public class SimulationResource {
     private String graceType;
     private Integer graceMonths;
     private BigDecimal balloonPercent;
+    private Boolean creditLifeInsuranceEnabled;
+    private BigDecimal creditLifeInsuranceMonthlyPercent;
+    private Boolean vehicleInsuranceEnabled;
+    private BigDecimal vehicleInsuranceAnnualPercent;
     private BigDecimal monthlyPayment;
     private BigDecimal teaPercent;
     private BigDecimal temPercent;
