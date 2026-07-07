@@ -12,6 +12,7 @@ public class SimulationRequest {
     @NotNull private Integer vehicleId;
     @NotNull private Integer financialProductId;
     @Positive private BigDecimal vehiclePrice;
+    @DecimalMin("0.0") private BigDecimal teaPercent;
     @NotNull @DecimalMin("0.0") @DecimalMax("100.0") private BigDecimal downPaymentPercent;
     @NotNull @Min(1) private Integer termMonths;
     @JsonAlias({"cok", "cokTea", "cokPercent", "discountRate", "discountRatePercent", "tasaDescuento", "tasaDescuentoPercent"})

@@ -18,14 +18,15 @@ public class FinancialEngine {
     private static final BigDecimal TWELVE = new BigDecimal("12");
     private static final BigDecimal CENT = new BigDecimal("0.01");
 
-    public record Input(BigDecimal vehiclePrice, BigDecimal downPaymentPercent, BigDecimal balloonPercent,
+    public record Input(BigDecimal vehiclePrice, BigDecimal teaPercent, BigDecimal downPaymentPercent, BigDecimal balloonPercent,
                         BigDecimal cokTeaPercent, int termMonths, GraceType graceType, int graceMonths,
                         LocalDate firstPaymentDate, int paymentDay, FinancialProductEntity product) {}
 
     public SimulationResult calculate(Input input) {
         validate(input);
         var product = input.product();
-        BigDecimal monthlyRate = effectiveMonthlyRate(product.getTeaPercent());
+        BigDecimal tea = input.teaPercent() == null ? product.getTeaPercent() : input.teaPercent();
+        BigDecimal monthlyRate = effectiveMonthlyRate(tea);
         BigDecimal cokTea = input.cokTeaPercent();
         BigDecimal cokMonthlyRate = effectiveMonthlyRate(cokTea);
         BigDecimal principal = input.vehiclePrice().multiply(BigDecimal.ONE.subtract(input.downPaymentPercent().divide(HUNDRED, MC)), MC);
@@ -129,7 +130,7 @@ public class FinancialEngine {
 
         var result = new SimulationResult();
         result.setMonthlyPayment(money(installment)); result.setBalloonAmount(money(balloon));
-        result.setTea(ratePercent(product.getTeaPercent())); result.setTem(ratePercent(monthlyRate.multiply(HUNDRED)));
+        result.setTea(ratePercent(tea)); result.setTem(ratePercent(monthlyRate.multiply(HUNDRED)));
         result.setCokTeaPercent(ratePercent(cokTea)); result.setCokTemPercent(ratePercent(cokMonthlyRate.multiply(HUNDRED)));
         // En la hoja, TIR es mensual y TCEA es la TIR mensual anualizada.
         result.setTir(ratePercent(monthlyIrr.multiply(HUNDRED))); result.setTcea(ratePercent(annualIrr.multiply(HUNDRED)));
@@ -144,9 +145,11 @@ public class FinancialEngine {
         if (i.vehiclePrice() == null || i.vehiclePrice().signum() <= 0) throw new IllegalArgumentException("El precio debe ser mayor a cero");
         if (i.product() == null) throw new IllegalArgumentException("El producto financiero es obligatorio");
         if (i.downPaymentPercent() == null || i.balloonPercent() == null) throw new IllegalArgumentException("Los porcentajes son obligatorios");
+        if (i.teaPercent() != null && i.teaPercent().signum() < 0) throw new IllegalArgumentException("La TEA no puede ser negativa");
         if (i.cokTeaPercent() == null) throw new IllegalArgumentException("El COK es obligatorio");
         if (i.cokTeaPercent().signum() < 0) throw new IllegalArgumentException("El COK no puede ser negativo");
-        if (i.cokTeaPercent().compareTo(i.product().getTeaPercent()) < 0) throw new IllegalArgumentException("El COK no puede ser menor a la TEA del producto");
+        BigDecimal tea = i.teaPercent() == null ? i.product().getTeaPercent() : i.teaPercent();
+        if (i.cokTeaPercent().compareTo(tea) < 0) throw new IllegalArgumentException("El COK no puede ser menor a la TEA del producto");
         if (i.graceType() == null) throw new IllegalArgumentException("El tipo de gracia es obligatorio");
         if (i.firstPaymentDate() == null) throw new IllegalArgumentException("La fecha de primera cuota es obligatoria");
         if (i.termMonths() < i.product().getMinTermMonths() || i.termMonths() > i.product().getMaxTermMonths()) throw new IllegalArgumentException("El plazo no está permitido por el producto");

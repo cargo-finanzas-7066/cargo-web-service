@@ -41,7 +41,7 @@ public class SimulationService {
         return request.getFinancialProductIds().stream().distinct().map(productId -> {
             FinancialProductEntity product = requireProduct(productId);
             var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
-                    request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
+                    null, request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
                     request.getFirstPaymentDate(), request.getPaymentDay(), product);
             var result = engine.calculate(input);
             var institution = product.getFinancialInstitution();
@@ -56,8 +56,9 @@ public class SimulationService {
         VehicleEntity vehicle = vehicleRepository.findByIdAndActiveTrue(request.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
         FinancialProductEntity product = requireProduct(request.getFinancialProductId());
+        validateTeaRange(request.getTeaPercent(), product);
         var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
-                request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
+                request.getTeaPercent(), request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
                 request.getFirstPaymentDate(), request.getPaymentDay(), product);
         SimulationResult result = engine.calculate(input);
 
@@ -93,8 +94,9 @@ public class SimulationService {
         VehicleEntity vehicle = vehicleRepository.findByIdAndActiveTrue(request.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("VehÃ­culo no encontrado"));
         FinancialProductEntity product = requireProduct(request.getFinancialProductId());
+        validateTeaRange(request.getTeaPercent(), product);
         var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
-                request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
+                request.getTeaPercent(), request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
                 request.getFirstPaymentDate(), request.getPaymentDay(), product);
         SimulationResult result = engine.calculate(input);
 
@@ -158,11 +160,27 @@ public class SimulationService {
         if (p.getValidFrom().isAfter(today) || (p.getValidUntil()!=null && p.getValidUntil().isBefore(today))) throw new UnprocessableEntityException("El producto financiero no está vigente");
         return p;
     }
-    private FinancialEngine.Input input(BigDecimal requestedPrice, VehicleEntity vehicle, BigDecimal down, BigDecimal balloon, BigDecimal cokTea,
+    private FinancialEngine.Input input(BigDecimal requestedPrice, VehicleEntity vehicle, BigDecimal down, BigDecimal balloon, BigDecimal tea, BigDecimal cokTea,
                                         int term, GraceType grace, int graceMonths, LocalDate first, int paymentDay, FinancialProductEntity product) {
         BigDecimal price = requestedPrice == null ? vehicle.getPrice() : requestedPrice;
         if (!product.getCurrency().equalsIgnoreCase(vehicle.getCurrency())) throw new UnprocessableEntityException("La moneda del vehículo no coincide con el producto");
-        return new FinancialEngine.Input(price, down, balloon, cokTea, term, grace, graceMonths, first, paymentDay, product);
+        return new FinancialEngine.Input(price, tea == null ? product.getTeaPercent() : tea, down, balloon, cokTea, term, grace, graceMonths, first, paymentDay, product);
+    }
+    private void validateTeaRange(BigDecimal tea, FinancialProductEntity product) {
+        if (tea == null) return;
+        String code = product.getFinancialInstitution().getCode();
+        BigDecimal min;
+        BigDecimal max;
+        switch (code) {
+            case "BCP" -> { min = new BigDecimal("8.00"); max = new BigDecimal("20.26"); }
+            case "BBVA" -> { min = new BigDecimal("1.99"); max = new BigDecimal("24.99"); }
+            case "INTERBANK" -> { min = new BigDecimal("0.00"); max = new BigDecimal("16.39"); }
+            case "SCOTIABANK" -> { min = new BigDecimal("8.99"); max = new BigDecimal("22.99"); }
+            default -> throw new UnprocessableEntityException("La entidad financiera no está habilitada para simulación");
+        }
+        if (tea.compareTo(min) < 0 || tea.compareTo(max) > 0) {
+            throw new UnprocessableEntityException("La TEA debe estar entre " + min + "% y " + max + "% para " + code);
+        }
     }
     private Map<String,Object> snapshot(FinancialProductEntity p) {
         var i=p.getFinancialInstitution(); var map=new LinkedHashMap<String,Object>();
