@@ -10,12 +10,14 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
+import java.util.Set;
 
 @Component
 @Profile("dev")
 @Order(10)
 @RequiredArgsConstructor
 public class FinancialInstitutionSeedService implements CommandLineRunner {
+    private static final Set<String> ENABLED_CODES = Set.of("BCP", "BBVA", "INTERBANK", "SCOTIABANK");
     private final FinancialInstitutionRepository financialInstitutionRepository;
     private final ObjectMapper objectMapper;
 
@@ -27,6 +29,7 @@ public class FinancialInstitutionSeedService implements CommandLineRunner {
 
         for (JsonNode node : root.path("entities")) {
             String code = node.path("code").asText();
+            if (!ENABLED_CODES.contains(code)) continue;
             var entity = financialInstitutionRepository.findByCode(code).orElse(new FinancialInstitutionEntity());
             entity.setCode(code);
             entity.setDisplayOrder(node.path("displayOrder").asInt());
@@ -77,6 +80,13 @@ public class FinancialInstitutionSeedService implements CommandLineRunner {
             applyExcelFirstSheetCorrections(entity);
             financialInstitutionRepository.save(entity);
         }
+        financialInstitutionRepository.findAll().stream()
+                .filter(entity -> entity.getCode() != null && !ENABLED_CODES.contains(entity.getCode()))
+                .forEach(entity -> {
+                    entity.setCanUseInSimulation(false);
+                    entity.setStatus("Inactivo");
+                    financialInstitutionRepository.save(entity);
+                });
     }
 
     private void applyExcelFirstSheetCorrections(FinancialInstitutionEntity entity) {
@@ -113,6 +123,18 @@ public class FinancialInstitutionSeedService implements CommandLineRunner {
             entity.setMinTerm(12);
             entity.setMaxTerm(60);
             entity.setTea(14.49);
+            entity.setCanUseInSimulation(true);
+            entity.setVerificationStatus("VERIFIED_FROM_DATASET");
+        }
+        if ("SCOTIABANK".equals(entity.getCode())) {
+            entity.setTeaPublishedLabel("8.99% - 22.99%");
+            entity.setMinimumInitialLabel("Desde 0%");
+            entity.setMaximumFinancingLabel("Hasta 100%");
+            entity.setMinDownPayment(0.0);
+            entity.setMaxFinancing(100.0);
+            entity.setMinTerm(12);
+            entity.setMaxTerm(72);
+            entity.setTea(12.50);
             entity.setCanUseInSimulation(true);
             entity.setVerificationStatus("VERIFIED_FROM_DATASET");
         }

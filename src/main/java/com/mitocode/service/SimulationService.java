@@ -41,7 +41,7 @@ public class SimulationService {
         return request.getFinancialProductIds().stream().distinct().map(productId -> {
             FinancialProductEntity product = requireProduct(productId);
             var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
-                    request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
+                    null, request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
                     request.getFirstPaymentDate(), request.getPaymentDay(), product);
             var result = engine.calculate(input);
             var institution = product.getFinancialInstitution();
@@ -56,8 +56,9 @@ public class SimulationService {
         VehicleEntity vehicle = vehicleRepository.findByIdAndActiveTrue(request.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
         FinancialProductEntity product = requireProduct(request.getFinancialProductId());
+        validateTeaRange(request.getTeaPercent(), product);
         var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
-                request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
+                request.getTeaPercent(), request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
                 request.getFirstPaymentDate(), request.getPaymentDay(), product);
         SimulationResult result = engine.calculate(input);
 
@@ -81,6 +82,42 @@ public class SimulationService {
 
         Integer id = entity.getId();
         var periods = result.getSchedule().stream().map(row -> period(id, row)).toList();
+        scheduleRepository.saveAll(periods);
+        return toResource(entity, result.getSchedule());
+    }
+
+    @Transactional
+    public SimulationResource update(Integer id, SimulationRequest request) {
+        UserEntity user = currentUserService.requireUser();
+        var entity = accessible(id, user);
+        requireClient(request.getClientId(), user);
+        VehicleEntity vehicle = vehicleRepository.findByIdAndActiveTrue(request.getVehicleId())
+                .orElseThrow(() -> new ResourceNotFoundException("VehÃ­culo no encontrado"));
+        FinancialProductEntity product = requireProduct(request.getFinancialProductId());
+        validateTeaRange(request.getTeaPercent(), product);
+        var input = input(request.getVehiclePrice(), vehicle, request.getDownPaymentPercent(), request.getBalloonPercent(),
+                request.getTeaPercent(), request.getCokTeaPercent(), request.getTermMonths(), request.getGraceType(), request.getGraceMonths(),
+                request.getFirstPaymentDate(), request.getPaymentDay(), product);
+        SimulationResult result = engine.calculate(input);
+
+        entity.setClientId(request.getClientId()); entity.setVehicleId(request.getVehicleId());
+        entity.setEntityId(product.getFinancialInstitution().getId()); entity.setFinancialProduct(product);
+        entity.setProductSnapshot(snapshot(product)); entity.setCurrency(product.getCurrency()); entity.setVehiclePrice(input.vehiclePrice());
+        entity.setDownPaymentPercent(input.downPaymentPercent());
+        entity.setDownPayment(input.vehiclePrice().multiply(input.downPaymentPercent()).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
+        entity.setFinancedAmount(result.getFinancedAmount()); entity.setTerm(input.termMonths()); entity.setFirstPaymentDate(input.firstPaymentDate());
+        entity.setDisbursementDate(input.firstPaymentDate().minusMonths(1)); entity.setPaymentDay(input.paymentDay());
+        entity.setGraceType(input.graceType().name()); entity.setGraceMonths(input.graceMonths());
+        entity.setBalloonEnabled(input.balloonPercent().signum() > 0); entity.setBalloonPercent(input.balloonPercent()); entity.setBalloonAmount(result.getBalloonAmount());
+        entity.setTea(result.getTea()); entity.setTem(result.getTem()); entity.setCokTea(result.getCokTeaPercent()); entity.setCokTem(result.getCokTemPercent()); entity.setMonthlyPayment(result.getMonthlyPayment());
+        entity.setVan(result.getVan()); entity.setTir(result.getTir()); entity.setTcea(result.getTcea());
+        entity.setTotalInterest(result.getTotalInterest()); entity.setTotalInsurance(result.getTotalInsurance());
+        entity.setTotalFees(result.getTotalCommissions()); entity.setTotalPayment(result.getTotalPayment()); entity.setStatus("Guardado");
+        entity = simulationRepository.save(entity);
+
+        scheduleRepository.deleteBySimulationId(entity.getId());
+        Integer simulationId = entity.getId();
+        var periods = result.getSchedule().stream().map(row -> period(simulationId, row)).toList();
         scheduleRepository.saveAll(periods);
         return toResource(entity, result.getSchedule());
     }
@@ -123,11 +160,27 @@ public class SimulationService {
         if (p.getValidFrom().isAfter(today) || (p.getValidUntil()!=null && p.getValidUntil().isBefore(today))) throw new UnprocessableEntityException("El producto financiero no está vigente");
         return p;
     }
-    private FinancialEngine.Input input(BigDecimal requestedPrice, VehicleEntity vehicle, BigDecimal down, BigDecimal balloon, BigDecimal cokTea,
+    private FinancialEngine.Input input(BigDecimal requestedPrice, VehicleEntity vehicle, BigDecimal down, BigDecimal balloon, BigDecimal tea, BigDecimal cokTea,
                                         int term, GraceType grace, int graceMonths, LocalDate first, int paymentDay, FinancialProductEntity product) {
         BigDecimal price = requestedPrice == null ? vehicle.getPrice() : requestedPrice;
         if (!product.getCurrency().equalsIgnoreCase(vehicle.getCurrency())) throw new UnprocessableEntityException("La moneda del vehículo no coincide con el producto");
-        return new FinancialEngine.Input(price, down, balloon, cokTea, term, grace, graceMonths, first, paymentDay, product);
+        return new FinancialEngine.Input(price, tea == null ? product.getTeaPercent() : tea, down, balloon, cokTea, term, grace, graceMonths, first, paymentDay, product);
+    }
+    private void validateTeaRange(BigDecimal tea, FinancialProductEntity product) {
+        if (tea == null) return;
+        String code = product.getFinancialInstitution().getCode();
+        BigDecimal min;
+        BigDecimal max;
+        switch (code) {
+            case "BCP" -> { min = new BigDecimal("8.00"); max = new BigDecimal("20.26"); }
+            case "BBVA" -> { min = new BigDecimal("1.99"); max = new BigDecimal("24.99"); }
+            case "INTERBANK" -> { min = new BigDecimal("0.00"); max = new BigDecimal("16.39"); }
+            case "SCOTIABANK" -> { min = new BigDecimal("8.99"); max = new BigDecimal("22.99"); }
+            default -> throw new UnprocessableEntityException("La entidad financiera no está habilitada para simulación");
+        }
+        if (tea.compareTo(min) < 0 || tea.compareTo(max) > 0) {
+            throw new UnprocessableEntityException("La TEA debe estar entre " + min + "% y " + max + "% para " + code);
+        }
     }
     private Map<String,Object> snapshot(FinancialProductEntity p) {
         var i=p.getFinancialInstitution(); var map=new LinkedHashMap<String,Object>();

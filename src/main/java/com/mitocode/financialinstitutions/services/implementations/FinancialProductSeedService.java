@@ -9,13 +9,18 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Set;
 
 @Component @Profile("dev") @Order(20) @RequiredArgsConstructor
 public class FinancialProductSeedService implements CommandLineRunner {
+    private static final Set<String> ENABLED_CODES = Set.of("BCP", "BBVA", "INTERBANK", "SCOTIABANK");
     private final FinancialInstitutionRepository institutions;
     private final FinancialProductRepository products;
     @Override public void run(String... args) {
-        institutions.findAll().stream().filter(i -> i.getCode()!=null).forEach(i -> {
+        products.findAll().stream()
+                .filter(p -> p.getFinancialInstitution() != null && p.getFinancialInstitution().getCode() != null && !ENABLED_CODES.contains(p.getFinancialInstitution().getCode()))
+                .forEach(p -> { p.setActive(false); products.save(p); });
+        institutions.findAll().stream().filter(i -> i.getCode()!=null && ENABLED_CODES.contains(i.getCode())).forEach(i -> {
             var existing = products.findFirstByFinancialInstitutionIdAndActiveTrueOrderByVersionDesc(i.getId());
             var p=existing.orElseGet(FinancialProductEntity::new);
             p.setFinancialInstitution(i);p.setProductName(i.getProduct()==null?"Crédito vehicular":i.getProduct());

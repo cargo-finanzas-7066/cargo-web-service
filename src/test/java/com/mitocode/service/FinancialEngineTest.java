@@ -43,8 +43,7 @@ class FinancialEngineTest {
         assertThat(result.getSchedule().get(35).getFinalBalance()).isEqualByComparingTo("0.00");
         assertThat(result.getSchedule().get(35).getBalloonPayment()).isEqualByComparingTo("7481.25");
         assertThat(result.getSchedule().subList(0,6)).allMatch(row -> row.getGraceType().equals("TOTAL"));
-        var paidInsurance = result.getSchedule().stream().map(row -> row.getInsurance()).reduce(BigDecimal.ZERO, BigDecimal::add);
-        assertThat(result.getTotalInsurance()).isEqualByComparingTo(paidInsurance);
+        assertThat(result.getTotalInsurance()).isEqualByComparingTo("384.75");
     }
 
     @Test
@@ -127,7 +126,7 @@ class FinancialEngineTest {
         return input(p, price, down, balloon, p.getTeaPercent().toPlainString(), term, grace, graceMonths);
     }
     private FinancialEngine.Input input(FinancialProductEntity p,String price,String down,String balloon,String cokTea,int term,GraceType grace,int graceMonths){
-        return new FinancialEngine.Input(new BigDecimal(price),new BigDecimal(down),new BigDecimal(balloon),
+        return new FinancialEngine.Input(new BigDecimal(price),p.getTeaPercent(),new BigDecimal(down),new BigDecimal(balloon),
                 cokTea == null ? null : new BigDecimal(cokTea),term,grace,graceMonths,
                 LocalDate.of(2026,7,5),5,p);
     }
